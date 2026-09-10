@@ -1,0 +1,232 @@
+import { ArrowLeftOutlined, EditOutlined } from '@ant-design/icons';
+import { Button, Skeleton } from 'antd';
+import { useNavigate, useParams } from 'react-router';
+
+import {
+  receiveOptionQuery,
+  useChainConfirm,
+  useChainVote,
+  useProposalExpiry,
+  ChainCard,
+  chainDeadlinePurpose,
+  type DeadlinePurpose,
+} from '@features/chains';
+
+import {
+  approvedVotes,
+  isAssembled,
+  isHardLocked,
+  useChains,
+  useExchangeOptions,
+  useReplacementsForChains,
+  type Chain,
+  type ExchangeOptions,
+  type ReplacementOption,
+} from '@entities/chain';
+import { useRequest } from '@entities/exchangeRequest';
+import { useItems } from '@entities/item';
+
+import { EmptyState, ErrorState, FadeInImage } from '@shared/ui';
+
+import './ChainListPage.scss';
+
+// as soon as one of the chains closes or freezes, the request's other options are dimmed
+// and become unavailable
+export function ChainListPage() {
+  const { requestId: requestIdParam } = useParams<{ requestId: string }>();
+  const navigate = useNavigate();
+  const requestId = requestIdParam ? Number(requestIdParam) : undefined;
+  const requestQuery = useRequest(requestId);
+  const optionsQuery = useExchangeOptions(requestId);
+  const itemsQuery = useItems();
+  const { confirmVote, isVoting } = useChainVote();
+  const { openConfirm } = useChainConfirm();
+
+  const request = requestQuery.data;
+  const options = optionsQuery.data ?? [];
+  const hasFrozen = options.some((entry) => isHardLocked(entry.status));
+  // an assembled or frozen chain occupies the request: candidate options are dimmed
+  const hasAssembled = options.some((entry) => isAssembled(entry.status));
+  // the request detail doesn't return a given-item snapshot — we take it from the items cache
+  const offeredItem = itemsQuery.data?.items.find((item) => item.id === request?.offeredItemId);
+
+  // exchange-options returns neither consent counters nor deadlines — we take them from chain details
+  const detailChainIds = options
+    .filter((entry) => entry.status === 'PROPOSED' || entry.status === 'FROZEN')
+    .map((entry) => entry.chainId);
+  const detailQueries = useChains(detailChainIds);
+  const detailByChain = new Map<number, Chain>();
+  detailQueries.forEach((query, index) => {
+    if (query.data) detailByChain.set(detailChainIds[index], query.data);
+  });
+
+  // the replacement pool is returned only to the actor: on their card the "Action required" button
+  // calls to choose a replacement instead of confirming; others' pools are empty and don't replace confirmation
+  const replacementChainIds = options
+    .filter((entry) => entry.status === 'PROPOSED')
+    .map((entry) => entry.chainId);
+  const replacementQueries = useReplacementsForChains(replacementChainIds);
+  const replacementByChain = new Map<number, ReplacementOption[]>();
+  replacementQueries.forEach((query, index) => {
+    if (query.data) replacementByChain.set(replacementChainIds[index], query.data);
+  });
+
+  useProposalExpiry(
+    options.map((entry) => ({
+      chainId: entry.chainId,
+      listStatus: entry.status,
+      detailStatus: detailByChain.get(entry.chainId)?.status,
+      deadlineAt: detailByChain.get(entry.chainId)?.freezeDeadlineAt,
+    })),
+  );
+
+  function approvedCountFor(entry: ExchangeOptions): number | undefined {
+    if (isHardLocked(entry.status)) return entry.length;
+    const detail = detailByChain.get(entry.chainId);
+    return detail ? approvedVotes(detail) : undefined;
+  }
+
+  function deadlineAtFor(entry: ExchangeOptions): string | null | undefined {
+    return detailByChain.get(entry.chainId)?.freezeDeadlineAt;
+  }
+
+  function deadlinePurposeFor(entry: ExchangeOptions): DeadlinePurpose | undefined {
+    const detail = detailByChain.get(entry.chainId);
+    return detail ? chainDeadlinePurpose(detail) : undefined;
+  }
+
+  // a non-empty pool is the only vacancy sign: a decline isn't visible in the chain body
+  function needsReplacementFor(entry: ExchangeOptions): boolean {
+    return entry.status === 'PROPOSED' && (replacementByChain.get(entry.chainId)?.length ?? 0) > 0;
+  }
+
+  if (requestQuery.isLoading || optionsQuery.isLoading || itemsQuery.isLoading) {
+    return (
+      <div className="chain-list-page">
+        <ChainListHeader onBack={() => navigate('/exchange-requests')} />
+        <div className="chain-list-page__body">
+          <Skeleton active paragraph={{ rows: 6 }} />
+        </div>
+      </div>
+    );
+  }
+
+  if (requestQuery.isError || optionsQuery.isError) {
+    return (
+      <div className="chain-list-page">
+        <ChainListHeader onBack={() => navigate('/exchange-requests')} />
+        <ErrorState
+          onRetry={() => {
+            void requestQuery.refetch();
+            void optionsQuery.refetch();
+          }}
+        />
+      </div>
+    );
+  }
+
+  // the backend returns chains by creation date, but the screen shows them by descending
+  // probability; the sort is stable, so options of one chain keep their original order
+  const receiveOptions = options
+    .flatMap((entry) => entry.receiveOptions.map((option) => ({ entry, option })))
+    .sort((a, b) => b.entry.score - a.entry.score);
+
+  return (
+    <div className="chain-list-page">
+      <ChainListHeader onBack={() => navigate('/exchange-requests')} />
+      <div className="chain-list-page__body">
+        {request ? (
+          <div className="chain-list-page__summary">
+            {/* thumbnail of the given item — 40×40, radius-sm */}
+            {offeredItem?.imageUrl ? (
+              <FadeInImage
+                className="chain-list-page__summary-photo"
+                src={offeredItem.imageUrl}
+                alt=""
+              />
+            ) : (
+              <div className="chain-list-page__summary-photo" aria-hidden />
+            )}
+            <div className="chain-list-page__summary-text">
+              <p className="chain-list-page__summary-line">
+                Отдаёте: {offeredItem?.title ?? 'Товар удалён'}
+              </p>
+              <p className="chain-list-page__summary-line chain-list-page__summary-line--muted">
+                Получаете: {request.wantedDescription}
+              </p>
+            </div>
+            <Button
+              className="chain-list-page__edit"
+              type="text"
+              icon={<EditOutlined aria-hidden />}
+              aria-label={hasFrozen ? 'Заявка заблокирована сделкой' : 'Редактировать запрос'}
+              title={hasFrozen ? 'Заявка заблокирована сделкой' : undefined}
+              disabled={hasFrozen}
+              onClick={() => navigate(`/exchange-requests/${requestId}/edit`)}
+            />
+          </div>
+        ) : null}
+
+        {hasFrozen ? (
+          <p className="chain-list-page__banner" role="status">
+            Сделка по одной из цепочек уже согласована. Остальные варианты недоступны.
+          </p>
+        ) : null}
+
+        {receiveOptions.length === 0 ? (
+          <EmptyState
+            title="Пока нет подходящих цепочек"
+            description="Попробуйте изменить запрос позже"
+          />
+        ) : (
+          <div className="chain-list-page__list motion-cascade">
+            {receiveOptions.map(({ entry, option }) => (
+              <ChainCard
+                key={`${entry.chainId}-${option.requestId}`}
+                options={entry}
+                option={option}
+                isVoting={isVoting}
+                locked={hasAssembled && !isAssembled(entry.status)}
+                approvedCount={approvedCountFor(entry)}
+                deadlineAt={deadlineAtFor(entry)}
+                deadlinePurpose={deadlinePurposeFor(entry)}
+                needsReplacement={needsReplacementFor(entry)}
+                onOpen={() =>
+                  navigate(`/chains/${entry.chainId}${receiveOptionQuery(option.requestId)}`)
+                }
+                onProceed={() => navigate(`/chains/${entry.chainId}/deal`)}
+                onConfirm={(chainId) => openConfirm(chainId)}
+                onReplace={() => navigate(`/chains/${entry.chainId}/replacement`)}
+                onVote={(active) =>
+                  confirmVote(
+                    {
+                      chainId: entry.chainId,
+                      requestId: entry.currentRequestId,
+                      targetRequestId: option.requestId,
+                    },
+                    active,
+                  )
+                }
+              />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ChainListHeader({ onBack }: { onBack: () => void }) {
+  return (
+    <header className="chain-list-page__header">
+      <Button
+        className="chain-list-page__back"
+        type="text"
+        icon={<ArrowLeftOutlined aria-hidden />}
+        aria-label="Назад"
+        onClick={onBack}
+      />
+      <h1 className="chain-list-page__title">Варианты обмена</h1>
+    </header>
+  );
+}

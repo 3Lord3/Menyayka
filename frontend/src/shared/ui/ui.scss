@@ -1,0 +1,134 @@
+.brand-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-text-primary);
+  line-height: 1.5;
+  letter-spacing: -1px;
+  user-select: none;
+}
+
+.brand-logo__icon {
+  display: block;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+}
+
+.status-tag {
+  display: inline-flex;
+  align-items: center;
+  // внутри flex-колонки пилюля растянулась бы на всю ширину контейнера
+  align-self: flex-start;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-heading);
+  white-space: nowrap;
+}
+
+.fade-in-image {
+  opacity: 0;
+  transition: opacity var(--motion-duration-base) var(--motion-ease-out);
+}
+
+.fade-in-image--loaded {
+  opacity: 1;
+}
+
+.empty-state,
+.error-state {
+  animation: motion-rise-in var(--motion-duration-base) var(--motion-ease-out) backwards;
+}
+
+.empty-state__icon,
+.error-state__icon {
+  animation: motion-pop-in var(--motion-duration-base) var(--motion-ease-out) 60ms backwards;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xl) var(--spacing-md);
+  text-align: center;
+}
+
+.empty-state__icon {
+  font-size: 48px;
+  line-height: 1;
+  color: var(--color-text-secondary);
+}
+
+.empty-state__title {
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-heading);
+  color: var(--color-text-primary);
+}
+
+.empty-state__description {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+  color: var(--color-text-secondary);
+}
+
+.empty-state__actions {
+  margin-top: var(--spacing-lg);
+}
+
+.error-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xl) var(--spacing-md);
+  text-align: center;
+}
+
+.error-state__icon {
+  font-size: 48px;
+  line-height: 1;
+  color: var(--color-status-error);
+}
+
+.error-state__title {
+  font-size: var(--font-size-subtitle);
+  font-weight: var(--font-weight-medium);
+  line-height: var(--line-height-heading);
+}
+
+.error-state__description {
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+  color: var(--color-text-secondary);
+}
+
+.error-state__retry {
+  margin-top: var(--spacing-sm);
+}
+
+.avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  border-radius: var(--radius-full);
+  font-weight: var(--font-weight-semibold);
+  user-select: none;
+}
+
+// заливка и цвет текста приходят инлайн из токенов темы
+.probability-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 var(--spacing-sm);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-heading);
+  white-space: nowrap;
+}

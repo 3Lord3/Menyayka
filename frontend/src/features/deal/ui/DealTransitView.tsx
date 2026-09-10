@@ -1,0 +1,268 @@
+import { useRef } from 'react';
+
+import { App as AntApp, Button } from 'antd';
+
+import {
+  myParticipant,
+  sourceParticipant,
+  type Chain,
+  type ChainParticipant,
+} from '@entities/chain';
+
+import { FadeInImage } from '@shared/ui';
+
+import { useDealFulfillment } from '../model/useDealFulfillment';
+import { useDispute } from '../model/useDispute';
+import { usePickupPoint } from '../model/usePickupPoint';
+
+import { DealBarcode } from './DealBarcode';
+import { DealDisputeModal } from './DealDisputeModal';
+import { DealItemSwap } from './DealItemSwap';
+import { DealPickupCard } from './DealPickupCard';
+import { DealSafetyBanner } from './DealSafetyBanner';
+import { DealSuccessModal } from './DealSuccessModal';
+import { DealTrackingModal } from './DealTrackingModal';
+
+import './deal.scss';
+import './DealTransitView.scss';
+
+interface DealTransitViewProps {
+  chain: Chain;
+  state:
+    | { status: 'shipped-waiting'; shipped: number; total: number }
+    | { status: 'in-transit'; shipped: number; total: number };
+  onOpenDetails: () => void;
+}
+
+// a text caption is mandatory — the status isn't conveyed by color alone
+function deliveryPill(status: ChainParticipant['requestStatus']): {
+  label: string;
+  tone: 'warning' | 'accent' | 'success';
+} {
+  switch (status) {
+    case 'DONE':
+      return { label: 'Доставлено', tone: 'success' };
+    case 'IN_PROGRESS':
+      // the item lies at the pickup point until everyone brought theirs — before the last
+      // ships, it's not "in transit"
+      return { label: 'Отправлен', tone: 'accent' };
+    default:
+      return { label: 'Ожидает отправки', tone: 'warning' };
+  }
+}
+
+export function DealTransitView({ chain, state, onOpenDetails }: DealTransitViewProps) {
+  const { modal } = AntApp.useApp();
+  const { confirmReceipt, isFulfilling } = useDealFulfillment(chain);
+  const { point } = usePickupPoint(chain.id);
+  const { disputed, openDispute } = useDispute(chain.id);
+  // the modals live in a portal outside the route tree — we close them by hand, like the
+  // rest of the deal modals
+  const tracking = useRef<{ destroy: () => void } | null>(null);
+  const dispute = useRef<{ destroy: () => void } | null>(null);
+
+  const closeTracking = () => {
+    tracking.current?.destroy();
+    tracking.current = null;
+  };
+
+  const openTracking = (participant: ChainParticipant) => {
+    tracking.current = modal.confirm({
+      icon: null,
+      centered: true,
+      width: 311,
+      content: (
+        <DealTrackingModal
+          title={participant.offeredItemTitle}
+          status={participant.requestStatus}
+          onClose={closeTracking}
+        />
+      ),
+      footer: null,
+    });
+  };
+
+  const closeDisputeModal = () => {
+    dispute.current?.destroy();
+    dispute.current = null;
+  };
+
+  const openDisputeConfirm = () => {
+    dispute.current = modal.confirm({
+      icon: null,
+      centered: true,
+      width: 311,
+      content: (
+        <DealDisputeModal
+          onClose={closeDisputeModal}
+          onConfirm={() => {
+            openDispute();
+            closeDisputeModal();
+            dispute.current = modal.confirm({
+              icon: null,
+              centered: true,
+              width: 311,
+              content: (
+                <DealSuccessModal
+                  emoji="🛠"
+                  title="Жалоба отправлена"
+                  text="Мы получили ваше обращение и свяжемся с вами в течение 24 часов, чтобы разобраться в ситуации."
+                  onClose={closeDisputeModal}
+                />
+              ),
+              footer: null,
+            });
+          }}
+        />
+      ),
+      footer: null,
+    });
+  };
+
+  if (state.status === 'shipped-waiting') {
+    return (
+      <div className="deal-transit">
+        <div className="deal-hero">
+          <p className="deal-hero__icon" aria-hidden>
+            🚚
+          </p>
+          <p className="deal-hero__title">Вы отправили товар</p>
+          <p className="deal-hero__text">Ждём, пока остальные участники принесут свои товары</p>
+        </div>
+
+        <DealSafetyBanner
+          label="Ваш товар в безопасности"
+          message="Ваш товар в безопасности: товары не будут отправлены, пока все участники не принесли их."
+        />
+
+        <section className="deal-transit__section">
+          <div className="deal-transit__section-head">
+            <h2 className="deal-transit__section-title">Статус доставки</h2>
+            <span className="deal-transit__count">
+              {state.shipped} из {state.total} отправлено
+            </span>
+          </div>
+          <ul className="deal-transit__items">
+            {chain.participants.map((participant) => {
+              const pill = deliveryPill(participant.requestStatus);
+              return (
+                <li key={participant.requestId} className="deal-transit__item">
+                  <ItemThumb participant={participant} />
+                  <span className="deal-transit__item-main">
+                    <span className="deal-transit__item-name">{participant.offeredItemTitle}</span>
+                    <span
+                      key={pill.label}
+                      className={`deal-transit__item-pill deal-transit__item-pill--${pill.tone}`}
+                    >
+                      {pill.label}
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    className="deal-transit__item-more"
+                    aria-label={`Трекинг: ${participant.offeredItemTitle}`}
+                    onClick={() => openTracking(participant)}
+                  >
+                    ›
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+
+        <div className="deal-actions">
+          <Button type="primary" size="large" block disabled>
+            Я забрал товар
+          </Button>
+          <p className="deal-actions__hint">Дождитесь, пока отправитель принесёт товар</p>
+          <Button size="large" block onClick={onOpenDetails}>
+            Посмотреть детали цепочки
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  const me = myParticipant(chain);
+  const source = sourceParticipant(chain);
+  // in a status race the source may still be LOCKED — we keep the button disabled until refetch
+  const canReceive = source?.requestStatus === 'IN_PROGRESS';
+
+  return (
+    <div className="deal-transit">
+      <DealBarcode chainId={chain.id} kind="receipt" />
+
+      <div className="deal-hero deal-hero--success">
+        <p className="deal-hero__icon" aria-hidden>
+          ✅
+        </p>
+        <p className="deal-hero__title">Ваш товар доставлен</p>
+        <p className="deal-hero__text">
+          Ваш товар уже в пункте выдачи. Проверьте его в удобное время.
+        </p>
+      </div>
+
+      <DealPickupCard address={point} />
+
+      <DealItemSwap
+        label="Вы получите"
+        giveTitle={me?.offeredItemTitle ?? 'Товар'}
+        giveImageUrl={me?.imageUrl}
+        receiveTitle={source?.offeredItemTitle ?? 'Товар'}
+        receiveImageUrl={source?.imageUrl}
+      />
+
+      {disputed ? (
+        <p className="deal-transit__disputed" role="status">
+          Жалоба на рассмотрении
+        </p>
+      ) : (
+        <div className="deal-transit__dispute">
+          <span>Проблемы с товаром?</span>
+          <Button type="link" size="small" onClick={openDisputeConfirm}>
+            Открыть спор
+          </Button>
+        </div>
+      )}
+
+      <div className="deal-actions">
+        <Button
+          type="primary"
+          size="large"
+          block
+          loading={isFulfilling}
+          disabled={!canReceive}
+          onClick={confirmReceipt}
+        >
+          Товар устраивает
+        </Button>
+        {canReceive ? (
+          <p className="deal-actions__hint">
+            Обычно это подтверждает пункт выдачи — в демо подтверждаете вы
+          </p>
+        ) : (
+          <p className="deal-actions__hint">Дождитесь, пока отправитель принесёт товар</p>
+        )}
+        <Button size="large" block onClick={onOpenDetails}>
+          Посмотреть детали цепочки
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ItemThumb({ participant }: { participant: ChainParticipant }) {
+  return (
+    <span
+      className={`deal-transit__thumb${participant.imageUrl ? '' : ' deal-transit__thumb--empty'}`}
+      aria-hidden
+    >
+      {participant.imageUrl ? (
+        <FadeInImage className="deal-transit__thumb-img" src={participant.imageUrl} alt="" />
+      ) : (
+        (participant.offeredItemTitle[0] ?? '')
+      )}
+    </span>
+  );
+}

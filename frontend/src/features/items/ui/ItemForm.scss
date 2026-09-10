@@ -1,0 +1,121 @@
+.item-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.item-form .ant-form-item {
+  margin-bottom: var(--spacing-lg);
+}
+
+.item-form .ant-form-item:last-child {
+  margin-bottom: 0;
+}
+
+.item-form__skeleton {
+  padding: var(--spacing-md) 0;
+}
+
+.item-form__lock {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md);
+  background: color-mix(in srgb, var(--color-status-warning) 12%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-primary);
+}
+
+.item-form__lock-icon {
+  color: var(--color-status-warning);
+  font-size: 16px;
+}
+
+.item-form__photo-preview {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+  aspect-ratio: 343 / 213;
+  min-height: 213px;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-bg-card);
+}
+
+.item-form__photo-preview--empty {
+  border: 1px dashed var(--color-border-default);
+}
+
+.item-form__photo-preview--filled {
+  border: none;
+}
+
+.item-form__photo-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.item-form__photo-add-icon {
+  font-size: 24px;
+  color: var(--color-text-secondary);
+}
+
+.item-form__photo-add {
+  font-size: var(--font-size-body-sm);
+  color: var(--color-text-secondary);
+}
+
+// antd Upload оборачивает триггер в inline-обёртки, схлопывающие карточку до высоты
+// контента — форсируем блочную ширину на всех уровнях
+.item-form__photo,
+.item-form__photo-upload,
+.item-form__photo-upload .ant-upload,
+.item-form__photo-upload .ant-upload-select {
+  width: 100%;
+}
+
+.item-form__photo-upload,
+.item-form__photo-upload .ant-upload,
+.item-form__photo-upload .ant-upload-select {
+  display: block !important;
+}
+
+// flex (а не block) обязателен: при display: block иконка и текст перестают быть
+// flex-элементами и gap между ними не работает
+.item-form__photo-remove {
+  display: flex;
+  width: fit-content;
+  margin: var(--spacing-sm) auto 0;
+  gap: var(--spacing-md) !important;
+}
+
+.item-form__submit {
+  margin-top: var(--spacing-sm);
+}
+
+.item-form__archive {
+  margin-top: var(--spacing-md);
+}
+
+// antd v6 вешает счётчик вплотную к нижней грани поля — резервируем под него место
+.item-form .ant-input-data-count {
+  bottom: -32px;
+}
+
+.item-form .ant-input-textarea-show-count {
+  margin-bottom: var(--spacing-sm);
+}
+
+.item-form .ant-input-textarea-show-count textarea {
+  resize: vertical;
+  max-height: 200px;
+}

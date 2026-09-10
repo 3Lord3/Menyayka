@@ -1,0 +1,308 @@
+import { useEffect } from 'react';
+
+import { screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { useSearchParams } from 'react-router';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import {
+  archiveItem,
+  createItem,
+  ItemImageUploadError,
+  updateItem,
+  useItem,
+  type Item,
+} from '@entities/item';
+
+import { renderWithProviders } from '@shared/testing/renderWithProviders';
+
+import { ItemForm } from './ItemForm';
+
+function queryOk(data: unknown) {
+  return { data, isPending: false, isError: false } as never;
+}
+
+vi.mock('@entities/item', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@entities/item')>();
+  return {
+    ...actual,
+    useItem: vi.fn(),
+    createItem: vi.fn(),
+    updateItem: vi.fn(),
+    archiveItem: vi.fn(),
+  };
+});
+
+const mockedUseItem = vi.mocked(useItem);
+const mockedCreateItem = vi.mocked(createItem);
+const mockedUpdateItem = vi.mocked(updateItem);
+const mockedArchiveItem = vi.mocked(archiveItem);
+
+const LONG_DESCRIPTION = 'Работают как новые, отличное состояние, полный комплект документов';
+
+const existingItem = {
+  id: 1,
+  title: 'Кухонный комбайн',
+  description: LONG_DESCRIPTION,
+  category: 'Мебель и интерьер',
+  imageUrl: 'data:image/png;base64,abc',
+} as unknown as Item;
+
+const photo = new File(['bytes'], 'photo.png', { type: 'image/png' });
+
+// the dropdown of 37 options is virtualized — the bottom rows never reach the DOM, so first
+// filter by search (showSearch is on), as a live user would
+async function pickCategory(user: ReturnType<typeof userEvent.setup>, name = 'Велосипеды') {
+  await user.click(screen.getByLabelText('Категория'));
+  await user.type(screen.getByLabelText('Категория'), name);
+  await user.click(await screen.findByTitle(name));
+}
+
+// writing search params of the edit screen to verify the preserved returnTo
+const editLocation = { search: '' };
+
+function EditScreenSpy() {
+  const [searchParams] = useSearchParams();
+  useEffect(() => {
+    editLocation.search = searchParams.toString();
+  }, [searchParams]);
+  return <div>edit screen</div>;
+}
+
+describe('ItemForm', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockedUseItem.mockReturnValue(queryOk(undefined));
+    editLocation.search = '';
+  });
+
+  it('keeps the submit button disabled until photo and required fields are filled', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<ItemForm />);
+
+    const submit = screen.getByRole('button', { name: /Сохранить/ });
+    expect(submit).toBeDisabled();
+
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+    await user.type(screen.getByLabelText('Название'), 'Смарт-часы');
+    await user.type(screen.getByLabelText('Описание'), LONG_DESCRIPTION);
+    expect(submit).toBeDisabled();
+
+    await pickCategory(user);
+    expect(submit).toBeEnabled();
+  });
+
+  // svg passes image/*, but the backend doesn't accept it — otherwise it's a 422 after a save
+  it('does not select a file with a disallowed type as the photo', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<ItemForm />);
+
+    const svg = new File(['<svg/>'], 'icon.svg', { type: 'image/svg+xml' });
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, svg);
+
+    // antd doesn't pass an out-of-accept file to beforeUpload — it silently never enters the form
+    expect(screen.getByText('Добавить фото')).toBeInTheDocument();
+    expect(screen.queryByText('Фото выбрано')).not.toBeInTheDocument();
+  });
+
+  it('rejects a file larger than the backend limit without selecting it', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<ItemForm />);
+
+    const big = new File([new Uint8Array(6 * 1024 * 1024)], 'big.png', { type: 'image/png' });
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, big);
+
+    expect(await screen.findByText('Фото не больше 5 МБ')).toBeInTheDocument();
+    expect(screen.getByText('Добавить фото')).toBeInTheDocument();
+    expect(screen.queryByText('Фото выбрано')).not.toBeInTheDocument();
+  });
+
+  it('blocks saving a description shorter than 25 characters', async () => {
+    const user = userEvent.setup();
+    const { container } = renderWithProviders(<ItemForm />);
+
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+    await user.type(screen.getByLabelText('Название'), 'Смарт-часы');
+    await user.type(screen.getByLabelText('Описание'), 'x'.repeat(24));
+    await pickCategory(user);
+
+    expect(await screen.findByText('Пожалуйста, опишите товар подробнее')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Сохранить/ })).toBeDisabled();
+  });
+
+  // otherwise the button is disabled with no error on screen — the user has no way to explain it
+  it('explains the blocked save for an item created before the 25-character rule', async () => {
+    mockedUseItem.mockReturnValue(queryOk({ ...existingItem, description: 'Мощный' }));
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(await screen.findByText('Пожалуйста, опишите товар подробнее')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Сохранить изменения/ })).toBeDisabled();
+  });
+
+  it('creates an item on submit', async () => {
+    const user = userEvent.setup();
+    mockedCreateItem.mockResolvedValue(existingItem);
+    const { container } = renderWithProviders(<ItemForm />, {
+      routes: [{ path: '/products', element: <div>products screen</div> }],
+    });
+
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+    await user.type(screen.getByLabelText('Название'), 'Смарт-часы');
+    await user.type(screen.getByLabelText('Описание'), LONG_DESCRIPTION);
+    await pickCategory(user);
+    await user.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    expect(await screen.findByText('products screen')).toBeInTheDocument();
+    expect(mockedCreateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Смарт-часы', description: LONG_DESCRIPTION }),
+      expect.any(File),
+    );
+  });
+
+  it('sends the picked category on create', async () => {
+    const user = userEvent.setup();
+    mockedCreateItem.mockResolvedValue(existingItem);
+    const { container } = renderWithProviders(<ItemForm />, {
+      routes: [{ path: '/products', element: <div>products screen</div> }],
+    });
+
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+    await user.type(screen.getByLabelText('Название'), 'Смарт-часы');
+    await user.type(screen.getByLabelText('Описание'), LONG_DESCRIPTION);
+    await pickCategory(user);
+    await user.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    expect(await screen.findByText('products screen')).toBeInTheDocument();
+    expect(mockedCreateItem).toHaveBeenCalledWith(
+      expect.objectContaining({ category: 'Велосипеды' }),
+      expect.any(File),
+    );
+  });
+
+  // a category outside the dictionary (data older than the migration) must stay selected,
+  // otherwise saving silently moves the item into another matching pool
+  it('keeps a category that is missing from the catalog', async () => {
+    mockedUseItem.mockReturnValue(queryOk({ ...existingItem, category: 'Антиквариат' } as Item));
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(screen.getByTitle('Антиквариат')).toBeInTheDocument();
+  });
+
+  it('redirects to edit with returnTo=request when the photo upload fails in create-from-request', async () => {
+    const user = userEvent.setup();
+    mockedCreateItem.mockRejectedValue(new ItemImageUploadError(existingItem, new Error('upload')));
+    const { container } = renderWithProviders(<ItemForm />, {
+      initialEntries: ['/products/new?returnTo=request'],
+      routes: [{ path: '/products/:itemId/edit', element: <EditScreenSpy /> }],
+    });
+
+    await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+    await user.type(screen.getByLabelText('Название'), 'Смарт-часы');
+    await user.type(screen.getByLabelText('Описание'), LONG_DESCRIPTION);
+    await pickCategory(user);
+    await user.click(screen.getByRole('button', { name: /Сохранить/ }));
+
+    expect(await screen.findByText('edit screen')).toBeInTheDocument();
+    expect(editLocation.search).toContain('returnTo=request');
+  });
+
+  it('shows an error state when the item fails to load', () => {
+    mockedUseItem.mockReturnValue({ data: undefined, isPending: false, isError: true } as never);
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(screen.getByText('Что-то пошло не так')).toBeInTheDocument();
+  });
+
+  it('prefills an existing item and saves the changes', async () => {
+    const user = userEvent.setup();
+    mockedUseItem.mockReturnValue(queryOk(existingItem));
+    mockedUpdateItem.mockResolvedValue(existingItem);
+    renderWithProviders(<ItemForm itemId={1} />, {
+      routes: [{ path: '/products', element: <div>products screen</div> }],
+    });
+
+    expect(screen.getByLabelText('Название')).toHaveValue('Кухонный комбайн');
+    expect(screen.getByLabelText('Описание')).toHaveValue(LONG_DESCRIPTION);
+
+    await user.clear(screen.getByLabelText('Название'));
+    await user.type(screen.getByLabelText('Название'), 'Комбайн Bosch');
+    await user.click(screen.getByRole('button', { name: /Сохранить изменения/ }));
+
+    expect(await screen.findByText('products screen')).toBeInTheDocument();
+    expect(mockedUpdateItem).toHaveBeenCalledWith(
+      1,
+      expect.objectContaining({
+        title: 'Комбайн Bosch',
+        description: LONG_DESCRIPTION,
+      }),
+      undefined,
+    );
+  });
+
+  it('requires a photo even when editing an item without one', () => {
+    mockedUseItem.mockReturnValue(queryOk({ ...existingItem, imageUrl: null }));
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(screen.getByText('Добавить фото')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Сохранить изменения/ })).toBeDisabled();
+  });
+
+  it('removing the photo blocks saving', async () => {
+    const user = userEvent.setup();
+    mockedUseItem.mockReturnValue(queryOk(existingItem));
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(screen.getByRole('button', { name: /Удалить фото/ })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: /Удалить фото/ }));
+
+    expect(screen.getByText('Добавить фото')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Сохранить изменения/ })).toBeDisabled();
+  });
+
+  // without the Object URL API there's no preview but a file is chosen: an <img> without src
+  // renders as a broken image, so we show a placeholder instead
+  it('shows a placeholder instead of a broken image when object URLs are unavailable', async () => {
+    const user = userEvent.setup();
+    const original = URL.createObjectURL;
+    // deliberately reproducing an environment without the Object URL API (via Reflect, to
+    // avoid depending on tsconfig strictness: assigning undefined directly types differently)
+    Reflect.set(URL, 'createObjectURL', undefined);
+    try {
+      const { container } = renderWithProviders(<ItemForm />);
+      await user.upload(container.querySelector('input[type="file"]') as HTMLInputElement, photo);
+
+      expect(screen.getByText('Фото выбрано')).toBeInTheDocument();
+      expect(screen.queryByRole('img', { name: 'Фото товара' })).not.toBeInTheDocument();
+      expect(screen.queryByText('Добавить фото')).not.toBeInTheDocument();
+    } finally {
+      Reflect.set(URL, 'createObjectURL', original);
+    }
+  });
+
+  it('archives an item through the confirmation modal and redirects', async () => {
+    const user = userEvent.setup();
+    mockedUseItem.mockReturnValue(queryOk(existingItem));
+    mockedArchiveItem.mockResolvedValue(undefined);
+    renderWithProviders(<ItemForm itemId={1} />, {
+      routes: [{ path: '/products', element: <div>products screen</div> }],
+    });
+
+    await user.click(screen.getByRole('button', { name: /Удалить товар/ }));
+    await user.click(await screen.findByRole('button', { name: /Да, удалить/ }));
+
+    expect(await screen.findByText('products screen')).toBeInTheDocument();
+    expect(mockedArchiveItem).toHaveBeenCalledWith(1);
+  });
+
+  // the exchanged item's form is reachable only via a direct link — there's nothing to edit,
+  // and the backend rejects mutations of an archived item
+  it('opens an exchanged item read-only', () => {
+    mockedUseItem.mockReturnValue(queryOk({ ...existingItem, status: 'ARCHIVED' }));
+    renderWithProviders(<ItemForm itemId={1} />);
+
+    expect(screen.getByText('Товар обменян и больше не редактируется')).toBeInTheDocument();
+    expect(screen.getByLabelText('Название')).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Сохранить изменения/ })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: /Удалить товар/ })).not.toBeInTheDocument();
+  });
+});

@@ -1,0 +1,225 @@
+import { theme, Button } from 'antd';
+
+import {
+  approvedVotes,
+  HARD_LOCK_MESSAGE,
+  hasDeal,
+  isAssembled,
+  isHardLocked,
+  myConfirmVote,
+  needsMyAction,
+  needsShipment,
+  receivesItem,
+  showsScore,
+  type Chain,
+  type ChainParticipant,
+} from '@entities/chain';
+
+import { plural } from '@shared/lib/plural';
+import { FadeInImage, ProbabilityBadge } from '@shared/ui';
+
+import { chainDeadlinePurpose } from '../model/useDeadlineLabel';
+
+import { ConsentBadge } from './ConsentBadge';
+import { DeadlineRow } from './DeadlineRow';
+
+import './ChainItemView.scss';
+
+interface ChainItemViewProps {
+  chain: Chain;
+  // the request of the chosen receive option: the screen shows exactly its item
+  receiveRequestId?: number;
+  isVoting: boolean;
+  // a non-empty replacement pool — a vacancy in the chain: the pill and button lead to
+  // replacement selection
+  needsReplacement?: boolean;
+  onVote: (candidate: ChainParticipant, active: boolean) => void;
+  onOpenParticipants: () => void;
+  onConfirm: () => void;
+  onProceed: () => void;
+  onReplace: () => void;
+  onDecline: () => void;
+}
+
+export function ChainItemView({
+  chain,
+  receiveRequestId,
+  isVoting,
+  needsReplacement,
+  onVote,
+  onOpenParticipants,
+  onConfirm,
+  onProceed,
+  onReplace,
+  onDecline,
+}: ChainItemViewProps) {
+  const { token } = theme.useToken();
+  const received = receivesItem(chain, receiveRequestId);
+  const single = received.length === 1 ? received[0] : null;
+  const assembled = isAssembled(chain.status);
+  const hardLocked = isHardLocked(chain.status);
+  const shipRequired = needsShipment(chain.status);
+  // an approved/rejected response can't be withdrawn (DELETE doesn't remove it) — no button for it
+  const voteCandidate =
+    received.find((candidate) => candidate.vote === 'pending') ??
+    received.find((candidate) => !candidate.vote) ??
+    null;
+  const canVote = chain.status === 'CANDIDATE' && voteCandidate !== null;
+  // for a vacancy in the chain we call to choose a replacement — without showing own confirmation
+  const confirmed =
+    chain.status === 'PROPOSED' && myConfirmVote(chain) === 'approved' && !needsReplacement;
+  const withdraw = voteCandidate?.vote === 'pending';
+
+  return (
+    <div className="chain-item">
+      <div className="chain-item__photo">
+        {single?.imageUrl ? (
+          <FadeInImage
+            className="chain-item__photo-img"
+            src={single.imageUrl}
+            alt={single.offeredItemTitle}
+          />
+        ) : (
+          <div className="chain-item__photo-placeholder" aria-hidden />
+        )}
+      </div>
+
+      <div className="chain-item__head">
+        <h2 className="chain-item__title">
+          {single?.offeredItemTitle ??
+            `Получаете: ${received.length} ${plural(received.length, ['вариант', 'варианта', 'вариантов'])}`}
+        </h2>
+        <div className="chain-item__meta">
+          <span className="chain-item__count">
+            {chain.length} {plural(chain.length, ['участник', 'участника', 'участников'])} в цепочке
+          </span>
+          {assembled ? (
+            <span className="chain-item__badges">
+              {showsScore(chain.status) ? <ProbabilityBadge score={chain.score} /> : null}
+              <ConsentBadge
+                key={approvedVotes(chain)}
+                count={approvedVotes(chain)}
+                total={chain.length}
+              />
+            </span>
+          ) : showsScore(chain.status) ? (
+            <ProbabilityBadge score={chain.score} />
+          ) : null}
+        </div>
+      </div>
+
+      {needsReplacement ? (
+        <p className="chain-item__replacement" role="status">
+          Участник отказался. Выберите замену, чтобы продолжить обмен
+        </p>
+      ) : hardLocked ? (
+        <p className="chain-item__lock">{HARD_LOCK_MESSAGE}</p>
+      ) : null}
+
+      <DeadlineRow
+        status={chain.status}
+        deadlineAt={chain.freezeDeadlineAt}
+        purpose={chainDeadlinePurpose(chain)}
+      />
+
+      {confirmed ? (
+        <p className="chain-item__confirmed" role="status">
+          Вы подтвердили · ждём остальных
+        </p>
+      ) : null}
+
+      {single?.offeredItemDescription ? (
+        <section className="chain-item__section">
+          <h3 className="chain-item__section-title">Описание</h3>
+          <p className="chain-item__description">{single.offeredItemDescription}</p>
+        </section>
+      ) : null}
+
+      <div className="chain-item__actions">
+        <Button className="chain-item__details" size="large" block onClick={onOpenParticipants}>
+          Посмотреть всю цепочку
+        </Button>
+        {canVote && voteCandidate ? (
+          <Button
+            className="chain-item__action"
+            type="primary"
+            size="large"
+            block
+            danger={withdraw}
+            loading={isVoting}
+            onClick={() => onVote(voteCandidate, !withdraw)}
+          >
+            {withdraw ? 'Отозвать отклик' : 'Откликнуться'}
+          </Button>
+        ) : needsReplacement ? (
+          <Button
+            className="chain-item__action"
+            type="primary"
+            size="large"
+            block
+            onClick={onReplace}
+          >
+            Требуется действие
+          </Button>
+        ) : needsMyAction(chain) ? (
+          <Button
+            className="chain-item__action"
+            type="primary"
+            size="large"
+            block
+            onClick={onConfirm}
+          >
+            Требуются действия
+          </Button>
+        ) : confirmed ? (
+          <Button
+            className="chain-item__decline"
+            type="text"
+            danger
+            size="large"
+            block
+            onClick={onDecline}
+          >
+            Отказаться от сделки
+          </Button>
+        ) : shipRequired ? (
+          <>
+            <Button
+              className="chain-item__action"
+              type="primary"
+              size="large"
+              block
+              onClick={onProceed}
+            >
+              Требуется действие
+            </Button>
+            <Button
+              className="chain-item__decline"
+              type="text"
+              danger
+              size="large"
+              block
+              onClick={onDecline}
+            >
+              Отказаться от сделки
+            </Button>
+          </>
+        ) : hasDeal(chain.status) ? (
+          <Button
+            className="chain-item__action"
+            size="large"
+            block
+            style={{
+              backgroundColor: token.colorSuccess,
+              borderColor: token.colorSuccess,
+              color: '#FFFFFF',
+            }}
+            onClick={onProceed}
+          >
+            Перейти к сделке
+          </Button>
+        ) : null}
+      </div>
+    </div>
+  );
+}

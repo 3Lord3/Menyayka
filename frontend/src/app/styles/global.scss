@@ -1,0 +1,75 @@
+@use './tokens.scss';
+@use './motion.scss';
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-family);
+  font-size: var(--font-size-body);
+  line-height: var(--line-height-body);
+  background-color: var(--color-bg-page);
+  color: var(--color-text-primary);
+  transition:
+    background-color var(--motion-duration-base) var(--motion-ease-standard),
+    color var(--motion-duration-base) var(--motion-ease-standard),
+    border-color var(--motion-duration-base) var(--motion-ease-standard);
+  -webkit-font-smoothing: antialiased;
+}
+
+// 0.01ms вместо 0: анимация нулевой длительности не стреляет animationend, и компоненты,
+// которые ждут это событие, зависли бы в переходном состоянии
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--color-accent-primary);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent-primary);
+  outline-offset: 2px;
+}
+
+// antd рендерит иконку показать/скрыть пароль без своего хит-бокса (~14×14px реального клика) —
+// расширяем зону через padding, гасим её же negative margin, чтобы верстка не сдвинулась
+.ant-input-password-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 15px;
+  margin: -15px;
+}
+
+.page-title {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-bold);
+  line-height: var(--line-height-heading);
+  margin-bottom: var(--spacing-md);
+}

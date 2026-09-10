@@ -1,0 +1,185 @@
+import type { ReactNode } from 'react';
+
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { act, renderHook } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { createTestQueryClient } from '@shared/testing/renderWithProviders';
+
+import { useProposalExpiry, type ProposalExpiryState } from './useProposalExpiry';
+
+function wrapperFor(client: QueryClient) {
+  return function Wrapper({ children }: { children: ReactNode }) {
+    return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
+  };
+}
+
+describe('useProposalExpiry', () => {
+  let client: QueryClient;
+  let invalidate: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-10T10:00:00Z'));
+    client = createTestQueryClient();
+    invalidate = vi.spyOn(client, 'invalidateQueries').mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function render(initial: ProposalExpiryState[]) {
+    return renderHook(
+      ({ states }: { states: ProposalExpiryState[] }) => useProposalExpiry(states),
+      {
+        initialProps: { states: initial },
+        wrapper: wrapperFor(client),
+      },
+    );
+  }
+
+  // until the list is re-requested it returns a stale PROPOSED with live buttons
+  it('invalidates the offer list once the detail has left PROPOSED', () => {
+    const { rerender } = render([
+      {
+        chainId: 7,
+        listStatus: 'PROPOSED',
+        detailStatus: 'PROPOSED',
+        deadlineAt: '2026-08-12T09:58:00Z',
+      },
+    ]);
+
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => {
+      rerender({
+        states: [
+          { chainId: 7, listStatus: 'PROPOSED', detailStatus: 'CANDIDATE', deadlineAt: null },
+        ],
+      });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['exchange-options'] });
+  });
+
+  it('keeps the list untouched while the list and the detail agree', () => {
+    render([
+      {
+        chainId: 7,
+        listStatus: 'PROPOSED',
+        detailStatus: 'PROPOSED',
+        deadlineAt: '2026-08-12T09:58:00Z',
+      },
+    ]);
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('ignores entries whose detail has not arrived yet', () => {
+    render([{ chainId: 7, listStatus: 'PROPOSED' }]);
+
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  // at the deadline we hit the detail: its response performs the lazy rollback on the backend
+  it('refetches the chain detail right after the deadline passes', () => {
+    render([
+      {
+        chainId: 7,
+        listStatus: 'PROPOSED',
+        detailStatus: 'PROPOSED',
+        deadlineAt: '2026-08-10T10:01:00Z',
+      },
+    ]);
+
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+    expect(invalidate).not.toHaveBeenCalled();
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chains', 7] });
+  });
+
+  it('fires immediately when the cached detail is already past its deadline', () => {
+    render([
+      {
+        chainId: 7,
+        listStatus: 'PROPOSED',
+        detailStatus: 'PROPOSED',
+        deadlineAt: '2026-08-10T09:00:00Z',
+      },
+    ]);
+
+    act(() => {
+      vi.advanceTimersByTime(2_000);
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chains', 7] });
+  });
+
+  it('does not schedule anything for candidate chains', () => {
+    render([{ chainId: 7, listStatus: 'CANDIDATE', detailStatus: 'CANDIDATE', deadlineAt: null }]);
+
+    expect(vi.getTimerCount()).toBe(0);
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  it('refetches the detail after the deadline without a list status', () => {
+    render([{ chainId: 7, detailStatus: 'PROPOSED', deadlineAt: '2026-08-10T10:01:00Z' }]);
+
+    act(() => {
+      vi.advanceTimersByTime(62_000);
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['chains', 7] });
+  });
+
+  // after the rollback, on the detail screen the list stays stale for the whole staleTime
+  it('invalidates the offer list when the watched detail leaves PROPOSED', () => {
+    const { rerender } = render([
+      { chainId: 7, detailStatus: 'PROPOSED', deadlineAt: '2026-08-10T10:01:00Z' },
+    ]);
+
+    act(() => {
+      rerender({ states: [{ chainId: 7, detailStatus: 'CANDIDATE', deadlineAt: null }] });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['exchange-options'] });
+  });
+
+  it('keeps the list untouched for a detail that was never seen as PROPOSED', () => {
+    render([{ chainId: 7, detailStatus: 'COMPLETED', deadlineAt: null }]);
+
+    expect(invalidate).not.toHaveBeenCalled();
+  });
+
+  // the scan must go through the whole array: otherwise the second chain's status won't be
+  // remembered and its own rollback later won't be recognized
+  it('remembers detail statuses past the first stale entry', () => {
+    const { rerender } = render([
+      { chainId: 7, listStatus: 'PROPOSED', detailStatus: 'CANDIDATE', deadlineAt: null },
+      { chainId: 8, detailStatus: 'PROPOSED', deadlineAt: '2026-08-12T09:58:00Z' },
+    ]);
+    invalidate.mockClear();
+
+    act(() => {
+      rerender({
+        states: [
+          { chainId: 7, listStatus: 'CANDIDATE', detailStatus: 'CANDIDATE', deadlineAt: null },
+          { chainId: 8, detailStatus: 'CANDIDATE', deadlineAt: null },
+        ],
+      });
+    });
+
+    expect(invalidate).toHaveBeenCalledWith({ queryKey: ['exchange-options'] });
+  });
+});

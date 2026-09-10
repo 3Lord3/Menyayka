@@ -1,0 +1,62 @@
+.deal-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg) 0;
+  text-align: center;
+}
+
+.deal-hero__icon {
+  margin: 0;
+  font-size: 40px;
+  line-height: 1.2;
+}
+
+.deal-hero__title {
+  margin: 0;
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-semibold);
+  line-height: var(--line-height-heading);
+  color: var(--color-text-primary);
+}
+
+.deal-hero__text {
+  margin: 0;
+  font-size: var(--font-size-body-sm);
+  line-height: var(--line-height-body);
+  color: var(--color-text-secondary);
+}
+
+// успех должен читаться и без иконки — блок залит тоном на 12%
+.deal-hero--success {
+  padding: var(--spacing-lg);
+  background: color-mix(in srgb, var(--color-status-success) 12%, transparent);
+  border-radius: var(--radius-md);
+}
+
+// margin-top: auto прижимает кнопки к низу, когда контент не заполняет высоту
+.deal-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: auto;
+}
+
+.deal-actions__hint {
+  margin: 0;
+  font-size: var(--font-size-caption);
+  line-height: var(--line-height-heading);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+// на десктопе не растягиваем экран на всю высоту: иначе margin-top: auto прижал бы кнопки
+// к низу очень высокого окна и оставил пустоту между ними и контентом
+@media (min-width: 1024px) {
+  .deal-ship,
+  .deal-transit,
+  .deal-done {
+    flex: 0 0 auto;
+  }
+}

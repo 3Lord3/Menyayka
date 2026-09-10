@@ -1,0 +1,60 @@
+import type { KeyboardEvent } from 'react';
+
+import { ITEM_STATUS_META, isItemExchanged, type Item } from '@entities/item';
+
+import { FadeInImage, StatusTag } from '@shared/ui';
+
+import './ProductCard.scss';
+
+interface ProductCardProps {
+  item: Item;
+  onClick: () => void;
+}
+
+export function ProductCard({ item, onClick }: ProductCardProps) {
+  const statusMeta = ITEM_STATUS_META[item.status];
+  // an exchanged item stays in the list as history, but there's nothing to open
+  const exchanged = isItemExchanged(item.status);
+  const label = item.category
+    ? `${item.title}, ${item.category}, ${statusMeta.label}`
+    : `${item.title}, ${statusMeta.label}`;
+
+  const interactiveProps = exchanged
+    ? {}
+    : {
+        role: 'button',
+        tabIndex: 0,
+        onClick,
+        onKeyDown: (event: KeyboardEvent<HTMLElement>) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onClick();
+          }
+        },
+      };
+
+  return (
+    <article
+      className={exchanged ? 'product-card product-card--exchanged' : 'product-card'}
+      aria-label={label}
+      {...interactiveProps}
+    >
+      <div className="product-card__photo">
+        {item.imageUrl ? (
+          <FadeInImage className="product-card__image" src={item.imageUrl} alt={item.title} />
+        ) : (
+          <div className="product-card__placeholder" aria-hidden />
+        )}
+        <div className="product-card__status">
+          <StatusTag tone={statusMeta.tone}>{statusMeta.label}</StatusTag>
+        </div>
+      </div>
+      <div className="product-card__body">
+        <p className="product-card__title">{item.title}</p>
+        {/* not every item has a category — ones created before the textual-category switch have it empty */}
+        {item.category ? <p className="product-card__category">{item.category}</p> : null}
+      </div>
+    </article>
+  );
+}

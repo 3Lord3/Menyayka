@@ -1,0 +1,47 @@
+import { FadeInImage } from '@shared/ui';
+
+import './DealItemSwap.scss';
+
+interface DealItemSwapProps {
+  label: string;
+  giveTitle: string;
+  giveImageUrl?: string | null;
+  receiveTitle: string;
+  receiveImageUrl?: string | null;
+}
+
+// the backend doesn't store item photos — thumbnails always show a placeholder
+export function DealItemSwap({
+  label,
+  giveTitle,
+  giveImageUrl,
+  receiveTitle,
+  receiveImageUrl,
+}: DealItemSwapProps) {
+  return (
+    <section className="deal-swap">
+      <p className="deal-swap__label">{label}</p>
+      <div className="deal-swap__row">
+        <ItemThumb title={giveTitle} imageUrl={giveImageUrl} />
+        <span className="deal-swap__name">{giveTitle}</span>
+        <span className="deal-swap__arrow" aria-hidden>
+          →
+        </span>
+        <ItemThumb title={receiveTitle} imageUrl={receiveImageUrl} />
+        <span className="deal-swap__name">{receiveTitle}</span>
+      </div>
+    </section>
+  );
+}
+
+function ItemThumb({ title, imageUrl }: { title: string; imageUrl?: string | null }) {
+  return (
+    <span className={`deal-swap__thumb${imageUrl ? '' : ' deal-swap__thumb--empty'}`} aria-hidden>
+      {imageUrl ? (
+        <FadeInImage className="deal-swap__thumb-img" src={imageUrl} alt="" />
+      ) : (
+        (title[0] ?? '')
+      )}
+    </span>
+  );
+}

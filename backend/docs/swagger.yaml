@@ -1,0 +1,1792 @@
+basePath: /api/v1
+definitions:
+  api.ErrorResponse:
+    properties:
+      code:
+        example: 500
+        type: integer
+      error:
+        example: внутренняя ошибка сервера
+        type: string
+    type: object
+  chain.chainParticipantResponse:
+    properties:
+      clusterId:
+        type: integer
+      imageUrl:
+        type: string
+      isCurrentUser:
+        type: boolean
+      offeredItemDescription:
+        type: string
+      offeredItemId:
+        type: integer
+      offeredItemTitle:
+        type: string
+      position:
+        type: integer
+      requestId:
+        type: integer
+      requestStatus:
+        $ref: '#/definitions/entity.RequestStatus'
+      vote:
+        $ref: '#/definitions/entity.VoteValue'
+      wantedDescription:
+        type: string
+    type: object
+  chain.chainResponse:
+    properties:
+      createdAt:
+        type: string
+      currentPosition:
+        type: integer
+      currentRequestId:
+        type: integer
+      freezeDeadlineAt:
+        type: string
+      givesToPosition:
+        type: integer
+      id:
+        type: integer
+      invalidReason:
+        type: string
+      length:
+        type: integer
+      participants:
+        items:
+          $ref: '#/definitions/chain.chainParticipantResponse'
+        type: array
+      receivesFromPosition:
+        type: integer
+      score:
+        type: number
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+      updatedAt:
+        type: string
+      version:
+        type: integer
+    type: object
+  chain.confirmResponse:
+    properties:
+      chainId:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+    type: object
+  chain.declineResponse:
+    properties:
+      chainId:
+        type: integer
+      replacementAvailable:
+        type: boolean
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+    type: object
+  chain.exchangeOptionResponse:
+    properties:
+      clusterId:
+        type: integer
+      description:
+        type: string
+      imageUrl:
+        type: string
+      itemId:
+        type: integer
+      requestId:
+        type: integer
+      title:
+        type: string
+      vote:
+        $ref: '#/definitions/entity.VoteValue'
+      wantedDescription:
+        type: string
+    type: object
+  chain.exchangeOptionsResponse:
+    properties:
+      chainId:
+        type: integer
+      currentOffer:
+        $ref: '#/definitions/chain.exchangeOptionResponse'
+      currentPosition:
+        type: integer
+      currentRequestId:
+        type: integer
+      givesToPosition:
+        type: integer
+      length:
+        type: integer
+      receiveOptions:
+        items:
+          $ref: '#/definitions/chain.exchangeOptionResponse'
+        type: array
+      receivesFromPosition:
+        type: integer
+      score:
+        type: number
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+    type: object
+  chain.fulfillmentResponse:
+    properties:
+      chainId:
+        type: integer
+      requestId:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+    type: object
+  chain.handoffRequest:
+    properties:
+      chainId:
+        type: integer
+      requestId:
+        type: integer
+    required:
+    - chainId
+    - requestId
+    type: object
+  chain.receiptRequest:
+    properties:
+      requestId:
+        type: integer
+    required:
+    - requestId
+    type: object
+  chain.replacementResponse:
+    properties:
+      description:
+        type: string
+      imageUrl:
+        type: string
+      offeredItemId:
+        type: integer
+      reliability:
+        type: number
+      requestId:
+        type: integer
+      respondedAt:
+        type: string
+      title:
+        type: string
+      wantedDescription:
+        type: string
+    type: object
+  chain.selectReplacementRequest:
+    properties:
+      requestId:
+        type: integer
+    required:
+    - requestId
+    type: object
+  chain.selectReplacementResponse:
+    properties:
+      chainId:
+        type: integer
+      requestId:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+    type: object
+  chain.thinkResponse:
+    properties:
+      chainId:
+        type: integer
+      vote:
+        $ref: '#/definitions/entity.VoteValue'
+    type: object
+  chain.unconfirmResponse:
+    properties:
+      chainId:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.ChainStatus'
+      vote:
+        $ref: '#/definitions/entity.VoteValue'
+    type: object
+  chain.voteRequest:
+    properties:
+      requestId:
+        type: integer
+      targetRequestId:
+        type: integer
+    required:
+    - requestId
+    - targetRequestId
+    type: object
+  chain.voteResponse:
+    properties:
+      chainId:
+        type: integer
+      chainStatus:
+        $ref: '#/definitions/entity.ChainStatus'
+      requestId:
+        type: integer
+      targetRequestId:
+        type: integer
+      vote:
+        $ref: '#/definitions/entity.VoteValue'
+      votedAt:
+        type: string
+    type: object
+  entity.ChainStatus:
+    enum:
+    - CANDIDATE
+    - PROPOSED
+    - FROZEN
+    - IN_PROGRESS
+    - COMPLETED
+    - BROKEN
+    type: string
+    x-enum-varnames:
+    - ChainStatusCandidate
+    - ChainStatusProposed
+    - ChainStatusFrozen
+    - ChainStatusInProgress
+    - ChainStatusCompleted
+    - ChainStatusBroken
+  entity.ItemStatus:
+    enum:
+    - ACTIVE
+    - UNAVAILABLE
+    - ARCHIVED
+    type: string
+    x-enum-varnames:
+    - ItemStatusActive
+    - ItemStatusUnavailable
+    - ItemStatusArchived
+  entity.RequestStatus:
+    enum:
+    - ACTIVE
+    - IN_PROPOSAL
+    - LOCKED
+    - DONE
+    - IN_PROGRESS
+    - REMOVED
+    type: string
+    x-enum-varnames:
+    - RequestStatusActive
+    - RequestStatusInProposal
+    - RequestStatusLocked
+    - RequestStatusDone
+    - RequestStatusInProgress
+    - RequestStatusRemoved
+  entity.VoteValue:
+    enum:
+    - pending
+    - approved
+    - thinking
+    - rejected
+    type: string
+    x-enum-varnames:
+    - VotePending
+    - VoteApproved
+    - VoteThinking
+    - VoteRejected
+  exchange_offer.createBody:
+    properties:
+      offeredItemId:
+        type: integer
+      wantedCategory:
+        maxLength: 100
+        type: string
+      wantedDescription:
+        maxLength: 5000
+        type: string
+    required:
+    - offeredItemId
+    type: object
+  exchange_offer.exchangeOfferListResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      offeredItemId:
+        type: integer
+      offeredItemTitle:
+        type: string
+      status:
+        $ref: '#/definitions/entity.RequestStatus'
+      updatedAt:
+        type: string
+      version:
+        type: integer
+      wantedCategory:
+        type: string
+      wantedDescription:
+        type: string
+    type: object
+  exchange_offer.exchangeOfferResponse:
+    properties:
+      createdAt:
+        type: string
+      id:
+        type: integer
+      offeredItemId:
+        type: integer
+      status:
+        $ref: '#/definitions/entity.RequestStatus'
+      updatedAt:
+        type: string
+      version:
+        type: integer
+      wantedCategory:
+        type: string
+      wantedDescription:
+        type: string
+    type: object
+  exchange_offer.updateBody:
+    properties:
+      offeredItemId:
+        type: integer
+      version:
+        type: integer
+      wantedCategory:
+        maxLength: 100
+        type: string
+      wantedDescription:
+        maxLength: 5000
+        type: string
+    required:
+    - offeredItemId
+    - version
+    type: object
+  item.createItemRequest:
+    properties:
+      category:
+        maxLength: 100
+        type: string
+      description:
+        maxLength: 2000
+        type: string
+      title:
+        maxLength: 200
+        type: string
+    type: object
+  item.itemResponse:
+    properties:
+      category:
+        type: string
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      imageUrl:
+        type: string
+      ownerUserId:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  item.listItemsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/item.itemResponse'
+        type: array
+      page:
+        type: integer
+      pageSize:
+        type: integer
+      total:
+        type: integer
+    type: object
+  item.updateItemRequest:
+    properties:
+      category:
+        maxLength: 100
+        type: string
+      description:
+        maxLength: 2000
+        type: string
+      status:
+        $ref: '#/definitions/entity.ItemStatus'
+      title:
+        maxLength: 200
+        type: string
+    type: object
+  user.changePasswordRequest:
+    properties:
+      currentPassword:
+        type: string
+      newPassword:
+        minLength: 8
+        type: string
+      newPasswordConfirmation:
+        type: string
+    required:
+    - currentPassword
+    - newPassword
+    - newPasswordConfirmation
+    type: object
+  user.loginRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  user.registerRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+      fullName:
+        maxLength: 100
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  user.resetPasswordRequest:
+    properties:
+      code:
+        type: string
+      email:
+        maxLength: 255
+        type: string
+      password:
+        minLength: 8
+        type: string
+    required:
+    - code
+    - email
+    - password
+    type: object
+  user.sendRecoveryCodeRequest:
+    properties:
+      email:
+        maxLength: 255
+        type: string
+    required:
+    - email
+    type: object
+  user.sessionResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/user.userResponse'
+    type: object
+  user.userResponse:
+    properties:
+      email:
+        type: string
+      fullName:
+        type: string
+      id:
+        type: string
+    type: object
+  user.verifyRecoveryCodeRequest:
+    properties:
+      code:
+        type: string
+      email:
+        maxLength: 255
+        type: string
+    required:
+    - code
+    - email
+    type: object
+info:
+  contact: {}
+  description: |-
+    HTTP API of the Menyayka barter/exchange service.
+    All successful responses return the resource body directly; errors share the {error, code} envelope.
+    Protected endpoints expect an `Authorization: Bearer <token>` header.
+  title: Menyayka API
+  version: "1.0"
+paths:
+  /account/password-recovery/reset-password/:
+    post:
+      consumes:
+      - application/json
+      description: Re-checks the code authoritatively, not relying on a prior verify
+        call.
+      parameters:
+      - description: Email + code + new password
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.resetPasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"message\": \"password_changed\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: invalid or expired code
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: user not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Reset password
+      tags:
+      - password-recovery
+  /account/password-recovery/send-code/:
+    post:
+      consumes:
+      - application/json
+      description: 'Emails a one-time recovery code (MVP: in-memory store, no rate
+        limiting).'
+      parameters:
+      - description: Recovery email
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.sendRecoveryCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"message\": \"code_sent\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: user not found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: SMTP not configured / send failed
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Send password recovery code
+      tags:
+      - password-recovery
+  /account/password-recovery/verify-code/:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Email + code
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.verifyRecoveryCodeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"message\": \"code_valid\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: invalid or expired code
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Verify recovery code
+      tags:
+      - password-recovery
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Password change payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.changePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"message\": \"password_changed\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: wrong current password
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Change password
+      tags:
+      - auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Validates credentials and returns a JWT session token.
+      parameters:
+      - description: Login payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.sessionResponse'
+        "401":
+          description: invalid email or password
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Log in
+      tags:
+      - auth
+  /auth/logout:
+    post:
+      description: 'Stateless JWT: the server only validates the token, nothing is
+        revoked.'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"message\": \"logged_out\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Log out
+      tags:
+      - auth
+  /auth/me:
+    get:
+      description: Returns the profile of the authenticated user.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.userResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Current user
+      tags:
+      - auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      description: Creates a user and returns a JWT session token.
+      parameters:
+      - description: Registration payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/user.registerRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user.sessionResponse'
+        "409":
+          description: email already registered
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Register a new user
+      tags:
+      - auth
+  /chains:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/chain.chainResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my chains
+      tags:
+      - chains
+  /chains/{id}:
+    get:
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.chainResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "410":
+          description: confirmation expired
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get chain
+      tags:
+      - chains
+  /chains/{id}/confirm:
+    post:
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.confirmResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: chain not proposed / request in two frozen chains
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "410":
+          description: confirmation expired
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Confirm participation in a chain
+      tags:
+      - chains
+  /chains/{id}/decline:
+    post:
+      description: Rejects a chain; the response flags whether a quick replacement
+        is available.
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.declineResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Decline a chain
+      tags:
+      - chains
+  /chains/{id}/receipt:
+    post:
+      consumes:
+      - application/json
+      description: Records that the authenticated recipient received the item; the
+        chain completes when every pinned request is DONE.
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Receipt payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/chain.receiptRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.fulfillmentResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: not the recipient
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: chain/handoff not ready
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: invalid payload
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Confirm item receipt
+      tags:
+      - chains
+  /chains/{id}/replacement:
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Replacement payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/chain.selectReplacementRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.selectReplacementResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: invalid replacement target
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Select a replacement
+      tags:
+      - chains
+  /chains/{id}/replacements:
+    get:
+      description: ACTIVE requests from the declining cluster that can replace a participant
+        without rebuilding the cycle.
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/chain.replacementResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List replacement options
+      tags:
+      - chains
+  /chains/{id}/think:
+    post:
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.thinkResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Mark an option as "thinking"
+      tags:
+      - chains
+  /chains/{id}/unconfirm:
+    post:
+      description: Returns the caller's decision to pending without removing the candidate
+        response.
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.unconfirmResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "410":
+          description: Gone
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Undo a round-two confirmation
+      tags:
+      - chains
+  /chains/{id}/votes:
+    delete:
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Request ID
+        in: query
+        name: requestId
+        required: true
+        type: integer
+      - description: Target request ID
+        in: query
+        name: targetRequestId
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Withdraw a vote
+      tags:
+      - chains
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Chain ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Vote payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/chain.voteRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.voteResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: vote not allowed
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: not a candidate
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error / invalid target
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Vote for an exchange option
+      tags:
+      - chains
+  /exchange-offers:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/exchange_offer.exchangeOfferListResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my exchange offers
+      tags:
+      - exchange-offers
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Offer payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/exchange_offer.createBody'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/exchange_offer.exchangeOfferResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error / offered item unavailable
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create exchange offer
+      tags:
+      - exchange-offers
+  /exchange-offers/{id}:
+    delete:
+      parameters:
+      - description: Offer ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Current offer version
+        in: query
+        name: version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: version conflict / offer locked
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete exchange offer
+      tags:
+      - exchange-offers
+    get:
+      parameters:
+      - description: Offer ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/exchange_offer.exchangeOfferResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get exchange offer
+      tags:
+      - exchange-offers
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Offer ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Offer payload (optimistic locking via version)
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/exchange_offer.updateBody'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/exchange_offer.exchangeOfferResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "403":
+          description: not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: version conflict / offer locked
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update exchange offer
+      tags:
+      - exchange-offers
+  /exchange-offers/{id}/exchange-options:
+    get:
+      description: Returns ready fulfilment options for the owner's request.
+      parameters:
+      - description: Exchange offer ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/chain.exchangeOptionsResponse'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List exchange options for an offer
+      tags:
+      - exchange-offers
+  /integrations/avito/handoffs:
+    post:
+      consumes:
+      - application/json
+      description: Temporary local delivery-confirmation callback (no external auth;
+        protect before production).
+      parameters:
+      - description: Handoff payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/chain.handoffRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/chain.fulfillmentResponse'
+        "409":
+          description: chain not ready / handoff pending
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: invalid payload
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      summary: Avito handoff callback
+      tags:
+      - integrations
+  /items:
+    get:
+      parameters:
+      - description: Page (default 1)
+        in: query
+        name: page
+        type: integer
+      - description: Page size (default 20)
+        in: query
+        name: pageSize
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/item.listItemsResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List my items
+      tags:
+      - items
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Item payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/item.createItemRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/item.itemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create item
+      tags:
+      - items
+  /items/{id}:
+    delete:
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: not found or not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: item has a hard reservation
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive item
+      tags:
+      - items
+    get:
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/item.itemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: not found or not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get item
+      tags:
+      - items
+    patch:
+      consumes:
+      - application/json
+      description: Partial update; only the provided fields are changed. Foreign and
+        missing items are both reported as 404.
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Fields to update
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/item.updateItemRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/item.itemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: not found or not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "409":
+          description: item has a hard reservation
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: validation error / archived / invalid status
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update item
+      tags:
+      - items
+  /items/{id}/image:
+    post:
+      consumes:
+      - multipart/form-data
+      description: Accepts multipart form field "image" (jpeg/png/webp, max 5 MiB)
+        and stores the photo in object storage.
+      parameters:
+      - description: Item ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Image file
+        in: formData
+        name: image
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/item.itemResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "404":
+          description: not found or not the owner
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "422":
+          description: missing file / unsupported type / too large
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/api.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Upload item image
+      tags:
+      - items
+  /ping:
+    get:
+      description: Scaffold endpoint proving the server and routing are up.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: '{\"status\": \"ok\", \"message\": \"pong\"}'
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Smoke-test endpoint
+      tags:
+      - system
+securityDefinitions:
+  BearerAuth:
+    description: Type "Bearer " followed by the JWT returned by /auth/login or /auth/register.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
