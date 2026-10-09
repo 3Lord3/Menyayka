@@ -5,6 +5,7 @@ import { DealDoneView, DealShipView, DealTransitView } from '@features/deal';
 
 import { dealState, useChain } from '@entities/chain';
 
+import { useRealtimeChain } from '@shared/realtime';
 import { ErrorState } from '@shared/ui';
 
 import { ChainPageHeader } from './ChainPageHeader';
@@ -16,6 +17,7 @@ export function DealPage() {
   const { chainId: chainIdParam } = useParams<{ chainId: string }>();
   const navigate = useNavigate();
   const chainId = chainIdParam ? Number(chainIdParam) : undefined;
+  useRealtimeChain(chainId);
   const { data: chain, isLoading, isError, refetch } = useChain(chainId);
   const state = chain ? dealState(chain) : null;
 

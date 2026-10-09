@@ -4,12 +4,14 @@ import { useAppDispatch } from '@app/store/hooks';
 import { logout } from '@app/store/slices/userSlice';
 
 import { queryClient } from '@shared/api';
+import { useRealtimeClient } from '@shared/realtime';
 
 import { logoutRequest } from '../api/authApi';
 
 export function useLogout() {
   const dispatch = useAppDispatch();
   const navigate = useNavigate();
+  const realtimeClient = useRealtimeClient();
 
   return async function logoutAndRedirect() {
     try {
@@ -20,6 +22,8 @@ export function useLogout() {
       // (or an expired token) local logout is still mandatory
     }
     dispatch(logout());
+    // kill the socket before clearing the cache, else in-flight events could repopulate it
+    realtimeClient?.disconnect();
     // the query cache must not survive an account switch — otherwise the next user sees foreign items
     queryClient.clear();
     navigate('/login', { replace: true });

@@ -4,6 +4,7 @@ import { AppstoreOutlined, SwapOutlined, UserOutlined } from '@ant-design/icons'
 import { NavLink, Outlet, useLocation } from 'react-router';
 
 import { useScreenMotionClass } from '@shared/lib/useScreenMotion';
+import { RealtimeStatusBanner, RealtimeStatusToast } from '@shared/realtime';
 import { BrandLogo } from '@shared/ui';
 import './AppLayout.scss';
 
@@ -63,6 +64,7 @@ export function AppLayout() {
           </nav>
         </aside>
         <main className="app-content">
+          <RealtimeStatusBanner />
           {/* key remounts the node on navigation — the screen's enter animation rides on it */}
           <div key={pathname} className={`app-content__screen ${screenMotionClass}`}>
             <Outlet />
@@ -79,6 +81,7 @@ export function AppLayout() {
           ))}
         </nav>
       ) : null}
+      <RealtimeStatusToast />
     </div>
   );
 }

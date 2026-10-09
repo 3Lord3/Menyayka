@@ -11,6 +11,10 @@ COPY . .
 ARG VITE_API_BASE_URL=
 ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
 
+# Realtime WebSocket switch; "false" degrades the app to polling (e.g. test env without WS).
+ARG VITE_REALTIME_ENABLED=true
+ENV VITE_REALTIME_ENABLED=$VITE_REALTIME_ENABLED
+
 RUN npm run build
 
 FROM nginx:1.27-alpine

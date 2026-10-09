@@ -51,6 +51,9 @@ const sharedComponents: ThemeConfig['components'] = {
   Button: { fontWeight: 600, fontSize: 16 },
   // Body 16px — antd draws 14px input text by default, which centers poorly in a 44px field
   Input: { inputFontSize: 16 },
+  // Select uses the global fontSize token (14px), not inputFontSize: keep it at 16 to
+  // match Input/TextArea in the same form.
+  Select: { fontSize: 16 },
   Segmented: { borderRadius: 8, borderRadiusSM: 4 },
   Card: { borderRadiusLG: 12 },
   Modal: { borderRadiusLG: 12 },

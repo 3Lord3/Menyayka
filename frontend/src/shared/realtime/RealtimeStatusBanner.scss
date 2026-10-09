@@ -1,0 +1,47 @@
+// Desktop feedback of the push channel (>=1024px); mobile uses RealtimeStatusToast.
+.realtime-banner {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .realtime-banner {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    min-height: 48px;
+    margin-bottom: var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-body-sm);
+    font-weight: var(--font-weight-medium);
+    border-radius: var(--radius-md);
+  }
+}
+
+.realtime-banner__text {
+  flex: 1;
+  min-width: 0;
+}
+
+.realtime-banner__action {
+  padding: 0;
+  font: inherit;
+  font-weight: var(--font-weight-semibold);
+  color: inherit;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.realtime-banner__action:hover {
+  text-decoration: underline;
+}
+
+.realtime-banner--offline {
+  color: var(--color-status-warning);
+  background: var(--color-status-warning-bg);
+}
+
+.realtime-banner--restored {
+  color: var(--color-status-success);
+  background: var(--color-status-success-bg);
+}

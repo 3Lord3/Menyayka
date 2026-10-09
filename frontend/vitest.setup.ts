@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom/vitest';
 import { cleanup } from '@testing-library/react';
-import { afterEach } from 'vitest';
+import { afterEach, vi } from 'vitest';
+
+// Default tests to polling (no WS backend); realtime tests opt in via vi.stubEnv before
+// the env module is imported.
+vi.stubEnv('VITE_REALTIME_ENABLED', 'false');
 
 // jsdom doesn't implement matchMedia, but antd's adaptive components rely on it;
 // a real node environment has no window, so the shim is included only under jsdom

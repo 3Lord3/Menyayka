@@ -10,6 +10,7 @@ import { store } from '@app/store';
 import { loginSucceeded } from '@app/store/slices/userSlice';
 
 import { queryClient } from '@shared/api';
+import { RealtimeContext } from '@shared/realtime/context';
 
 import { logoutRequest } from '../api/authApi';
 
@@ -83,5 +84,36 @@ describe('useLogout', () => {
 
     expect(store.getState().user.token).toBeNull();
     expect(location.pathname).toBe('/login');
+  });
+
+  // in-flight events must not repopulate the cache after logout
+  it('closes the realtime socket before clearing the cache', async () => {
+    mockedLogoutRequest.mockResolvedValue(undefined);
+    const disconnect = vi.fn();
+    const clear = vi.spyOn(queryClient, 'clear');
+
+    function realtimeWrapper({ children }: { children: ReactNode }) {
+      return (
+        <Provider store={store}>
+          <RealtimeContext.Provider value={{ disconnect } as never}>
+            <MemoryRouter initialEntries={['/profile']}>
+              <Routes>
+                <Route path="*" element={children} />
+              </Routes>
+              <LocationSpy />
+            </MemoryRouter>
+          </RealtimeContext.Provider>
+        </Provider>
+      );
+    }
+
+    const { result } = renderHook(() => useLogout(), { wrapper: realtimeWrapper });
+
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(disconnect).toHaveBeenCalledOnce();
+    expect(disconnect.mock.invocationCallOrder[0]).toBeLessThan(clear.mock.invocationCallOrder[0]);
   });
 });

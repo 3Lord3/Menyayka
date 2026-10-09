@@ -1,5 +1,7 @@
 import { useRestoreSession } from '@features/auth';
 
+import { RealtimeProvider } from '@shared/realtime';
+
 import { AppProviders } from './providers';
 import { RouterProvider } from './router/RouterProvider';
 
@@ -13,8 +15,10 @@ function SessionRestorer() {
 export function App() {
   return (
     <AppProviders>
-      <SessionRestorer />
-      <RouterProvider />
+      <RealtimeProvider>
+        <SessionRestorer />
+        <RouterProvider />
+      </RealtimeProvider>
     </AppProviders>
   );
 }

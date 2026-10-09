@@ -8,6 +8,9 @@ import { createTestQueryClient } from '@shared/testing/renderWithProviders';
 
 import { useProposalExpiry, type ProposalExpiryState } from './useProposalExpiry';
 
+const realtime = vi.hoisted(() => ({ connected: false }));
+vi.mock('@shared/realtime', () => ({ useRealtimeConnected: () => realtime.connected }));
+
 function wrapperFor(client: QueryClient) {
   return function Wrapper({ children }: { children: ReactNode }) {
     return <QueryClientProvider client={client}>{children}</QueryClientProvider>;
@@ -181,5 +184,46 @@ describe('useProposalExpiry', () => {
     });
 
     expect(invalidate).toHaveBeenCalledWith({ queryKey: ['exchange-options'] });
+  });
+
+  // while the socket is live the backend emits chain.expired; the timer is redundant
+  it('skips the deadline timers while the socket is live', () => {
+    realtime.connected = true;
+    try {
+      render([
+        {
+          chainId: 7,
+          listStatus: 'PROPOSED',
+          detailStatus: 'PROPOSED',
+          deadlineAt: '2026-08-10T10:01:00Z',
+        },
+      ]);
+
+      act(() => {
+        vi.advanceTimersByTime(120_000);
+      });
+
+      expect(vi.getTimerCount()).toBe(0);
+      expect(invalidate).not.toHaveBeenCalled();
+    } finally {
+      realtime.connected = false;
+    }
+  });
+
+  it('keeps the list heuristic off while the socket is live', () => {
+    realtime.connected = true;
+    try {
+      const { rerender } = render([
+        { chainId: 7, detailStatus: 'PROPOSED', deadlineAt: '2026-08-12T09:58:00Z' },
+      ]);
+
+      act(() => {
+        rerender({ states: [{ chainId: 7, detailStatus: 'CANDIDATE', deadlineAt: null }] });
+      });
+
+      expect(invalidate).not.toHaveBeenCalled();
+    } finally {
+      realtime.connected = false;
+    }
   });
 });

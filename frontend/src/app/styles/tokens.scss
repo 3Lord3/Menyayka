@@ -48,6 +48,8 @@
   --color-status-success: #52c41a;
   --color-status-warning: #faad14;
   --color-status-error: #ff4d4f;
+  --color-status-warning-bg: #fff7e6;
+  --color-status-success-bg: #f6ffed;
   --color-border-default: #d9d9d9;
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
@@ -61,6 +63,8 @@
   --color-status-success: #52c41a;
   --color-status-warning: #faad14;
   --color-status-error: #ff4d4f;
+  --color-status-warning-bg: #2b2111;
+  --color-status-success-bg: #162312;
   --color-border-default: #3a3a3a;
   /* в тёмной теме элевация карточек передаётся отличием bg-card от bg-page, тень не рисуется */
   --shadow-card: none;

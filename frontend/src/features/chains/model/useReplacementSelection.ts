@@ -15,6 +15,7 @@ import {
 } from '@entities/chain';
 
 import { getErrorMessage } from '@shared/lib/errorMessage';
+import { useRealtimeConnected } from '@shared/realtime';
 
 import { declineMessage } from './declineMessage';
 import { EXPIRED_CHAIN_MESSAGE, isChainExpired } from './expiredChain';
@@ -22,11 +23,19 @@ import { replacementInvited } from './replacementInvited';
 import { replacementStage, type ReplacementStage } from './replacementStage';
 
 const WAITING_POLL_INTERVAL = 15_000;
+// with a push channel the wait resolves by events; polling is a slow safety net
+const REALTIME_WAITING_FALLBACK_MS = 5 * 60_000;
+
+function waitingPollInterval(realtimeConnected: boolean): number {
+  return realtimeConnected ? REALTIME_WAITING_FALLBACK_MS : WAITING_POLL_INTERVAL;
+}
 
 export function useReplacementSelection(chainId?: number) {
   const navigate = useNavigate();
   const { message, modal } = AntApp.useApp();
   const queryClient = useQueryClient();
+  // keep the fallback fast whenever the socket is not actually up
+  const realtimeConnected = useRealtimeConnected();
   // the record survives a reload: otherwise the waiting screen turns back into candidate selection
   const [invited, setInvited] = useState(() => replacementInvited.get(chainId));
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -50,7 +59,9 @@ export function useReplacementSelection(chainId?: number) {
     refetch: refetchChain,
   } = useChain(chainId, {
     refetchInterval: (current) =>
-      invited !== null && current?.status === 'PROPOSED' ? WAITING_POLL_INTERVAL : false,
+      invited !== null && current?.status === 'PROPOSED'
+        ? waitingPollInterval(realtimeConnected)
+        : false,
   });
 
   // outside PROPOSED no pool exists and the query would return 409
@@ -62,7 +73,9 @@ export function useReplacementSelection(chainId?: number) {
   } = useReplacements(chainId, {
     enabled: chain?.status === 'PROPOSED',
     refetchInterval:
-      invited !== null && chain?.status === 'PROPOSED' ? WAITING_POLL_INTERVAL : false,
+      invited !== null && chain?.status === 'PROPOSED'
+        ? waitingPollInterval(realtimeConnected)
+        : false,
   });
 
   // the only thing bounding the record's lifetime: otherwise the next replacement on this
