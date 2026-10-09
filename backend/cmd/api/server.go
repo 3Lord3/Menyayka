@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ import (
 	"github.com/Avito-Team-Not-Found/menyayka/internal/infrastructure/chainnotification"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/infrastructure/embedding"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/infrastructure/mailer"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	chainRepo "github.com/Avito-Team-Not-Found/menyayka/internal/repository/chain"
 	clusterRepo "github.com/Avito-Team-Not-Found/menyayka/internal/repository/cluster"
 	exchangeOfferRepo "github.com/Avito-Team-Not-Found/menyayka/internal/repository/exchange_offer"
@@ -43,7 +45,10 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	}
 	logger.Info("connected to PostgreSQL, pgvector OK")
 
+	// Join workers before closing the pool.
+	var workers sync.WaitGroup
 	cleanup := func() {
+		waitTimeout(&workers, workerShutdownTimeout)
 		pool.Close()
 	}
 
@@ -79,8 +84,23 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 		cfg.CycleMaxDrafts,
 		cfg.MatchingThreshold,
 	).WithQualityRules(cfg.CycleMinAverageScore, cfg.CycleMaxScoreGap)
-	transactionManager := database.NewTransactionManager(pool)
 	chainRepository := chainRepo.NewRepository(pool, cfg.MatchingThreshold)
+
+	hub := realtime.NewHub(ctx, realtime.HubConfig{
+		Heartbeat:       cfg.WSHeartbeat,
+		WriteTimeout:    cfg.WSWriteTimeout,
+		MaxChainSubs:    cfg.WSMaxChainSubs,
+		SubTTL:          cfg.WSSubTTL,
+		MaxConnections:  cfg.WSMaxConnections,
+		MaxConnsPerUser: cfg.WSMaxConnsPerUser,
+		MsgRate:         cfg.WSMsgRate,
+		MsgRateWindow:   cfg.WSMsgRateWindow,
+	}, logger)
+	// TxEmitter is both TransactionManager and Emitter: events buffered inside a
+	// transaction flush to the Hub only after commit.
+	transactionManager := realtime.NewTxEmitter(database.NewTransactionManager(pool), hub).
+		WithLogger(logger).
+		WithParticipantResolver(chainRepository)
 
 	scoreRanker, err := matching.NewRuntimeRanker(cfg.RankerMode, cfg.RankerModelPath)
 	if err != nil {
@@ -90,6 +110,7 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	chainSvc := chainservice.NewService(chainRepository, transactionManager)
 	chainSvc = chainSvc.WithScorer(scoreRanker)
 	chainSvc = chainSvc.WithNotifier(chainnotification.New(pool, mailerSvc))
+	chainSvc = chainSvc.WithRealtimeEmitter(transactionManager)
 
 	matchingFacade := matching.NewFacade(clusterSvc, cycleFinder, chainSvc).
 		WithRanker(scoreRanker).
@@ -113,7 +134,7 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 		embedClient,
 		matchingFacade,
 		transactionManager,
-	)
+	).WithRealtimeEmitter(transactionManager)
 	exchangeOfferH := exchangeOfferHandler.NewHandler(exchangeOfferSvc)
 
 	publicUseSSL := cfg.MinIOPublicUseSSL
@@ -132,11 +153,20 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	}
 
 	itemRepository := itemRepo.NewRepository(pool)
-	itemSvc := itemService.NewService(itemRepository, embedClient, imageStorage)
+	itemSvc := itemService.NewService(itemRepository, embedClient, imageStorage).
+		WithRealtimeEmitter(transactionManager)
 	itemH := itemHandler.NewHandler(itemSvc)
 	chainH := chainHandler.NewHandler(chainSvc)
 
-	engine := router.New(tokenService, pingHandler, userH, exchangeOfferH, itemH, chainH)
+	realtimeH := realtime.NewHandler(hub, tokenService, codeStore, chainRepository, cfg, logger)
+	if len(cfg.WSAllowedOrigins) == 0 {
+		logger.Warn("WS_ALLOWED_ORIGINS is empty: browser WebSocket handshakes are rejected (fail-closed) and the frontend degrades to polling")
+	}
+
+	startWorker(&workers, func() { runExpiryWorker(ctx, chainSvc, logger) })
+	startWorker(&workers, func() { runCodeStoreSweeper(ctx, codeStore, logger) })
+
+	engine := router.New(tokenService, pingHandler, userH, exchangeOfferH, itemH, chainH, realtimeH)
 
 	srv := &http.Server{
 		Addr:         ":" + cfg.ServerPort,
@@ -146,4 +176,91 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 		IdleTimeout:  60 * time.Second,
 	}
 	return srv, cleanup, nil
+}
+
+const (
+	expiryWorkerInterval   = 45 * time.Second
+	codeStoreSweepInterval = 5 * time.Minute
+	// Per-tick deadlines: a stalled query aborts instead of delaying later ticks.
+	expiryWorkerTickTimeout = 30 * time.Second
+	codeStoreSweepTimeout   = 10 * time.Second
+	workerShutdownTimeout   = 5 * time.Second
+)
+
+type chainExpirer interface {
+	ExpireDue(ctx context.Context) error
+}
+
+// startWorker starts a loop joined on shutdown.
+func startWorker(workers *sync.WaitGroup, run func()) {
+	workers.Add(1)
+	go func() {
+		defer workers.Done()
+		run()
+	}()
+}
+
+// waitTimeout waits for wg up to timeout.
+func waitTimeout(wg *sync.WaitGroup, timeout time.Duration) {
+	done := make(chan struct{})
+	go func() {
+		wg.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+	case <-time.After(timeout):
+	}
+}
+
+// runTick runs one tick with its own deadline and a panic guard.
+func runTick(ctx context.Context, logger *logrus.Logger, name string, fn func(context.Context) error, timeout time.Duration) {
+	tickCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	defer func() {
+		if r := recover(); r != nil {
+			logger.WithField("panic", r).Error(name + " tick panicked")
+		}
+	}()
+	start := time.Now()
+	if err := fn(tickCtx); err != nil {
+		logger.WithError(err).Error(name + " tick failed")
+		return
+	}
+	logger.WithField("duration", time.Since(start)).Debug(name + " tick done")
+}
+
+// runExpiryWorker applies elapsed chain deadlines, single-flight (the next tick
+// is scheduled only after the previous one finished).
+func runExpiryWorker(ctx context.Context, expirer chainExpirer, logger *logrus.Logger) {
+	timer := time.NewTimer(expiryWorkerInterval)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			runTick(ctx, logger, "expiry worker", expirer.ExpireDue, expiryWorkerTickTimeout)
+			timer.Reset(expiryWorkerInterval)
+		}
+	}
+}
+
+// runCodeStoreSweeper removes unused one-time codes (recovery codes, ws tickets).
+func runCodeStoreSweeper(ctx context.Context, store *codestore.Store, logger *logrus.Logger) {
+	ticker := time.NewTicker(codeStoreSweepInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			runTick(ctx, logger, "codestore sweeper", func(context.Context) error {
+				if removed := store.Sweep(time.Now()); removed > 0 {
+					logger.WithField("removed", removed).Debug("codestore sweep removed expired entries")
+				}
+				return nil
+			}, codeStoreSweepTimeout)
+		}
+	}
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/utils/ranker"
 )
 
@@ -21,6 +22,7 @@ type Service struct {
 	transactions database.TransactionManager
 	scorer       ranker.Ranker
 	notifier     Notifier
+	emitter      realtime.Emitter
 	freezer      *FreezeService
 }
 
@@ -43,6 +45,13 @@ func (s *Service) WithScorer(scorer ranker.Ranker) *Service {
 // WithNotifier hooks up sending of chain-event notifications.
 func (s *Service) WithNotifier(notifier Notifier) *Service {
 	s.notifier = notifier
+	return s
+}
+
+// WithRealtimeEmitter sets the realtime emitter; pass the same tx-aware emitter
+// used as the transaction manager so events flush only after commit.
+func (s *Service) WithRealtimeEmitter(emitter realtime.Emitter) *Service {
+	s.emitter = emitter
 	return s
 }
 

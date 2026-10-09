@@ -67,38 +67,57 @@ func (s *FreezeService) Freeze(ctx context.Context, tx database.Tx, chainID int6
 	return nil
 }
 
-// ExpireDue applies every elapsed chain deadline in the caller transaction.
-// It is intentionally request-driven: each public chain API call invokes it,
-// which keeps externally visible state current without a background worker.
-func (s *FreezeService) ExpireDue(ctx context.Context, tx database.Tx) error {
+// ExpiredChain reports one chain whose deadline elapsed; ReleasedRequestIDs lists
+// the requests it freed.
+type ExpiredChain struct {
+	ChainID            int64
+	ReleasedRequestIDs []int64
+}
+
+// ExpireResult reports what ExpireDue changed.
+type ExpireResult struct {
+	ExpiredChains      []ExpiredChain
+	ReleasedRequestIDs []int64
+}
+
+// ExpireDue applies elapsed chain deadlines in the caller transaction and reports
+// the changed chains.
+func (s *FreezeService) ExpireDue(ctx context.Context, tx database.Tx) (ExpireResult, error) {
 	if s.store == nil {
-		return entity.ErrChainRepositoryNotConfigured
+		return ExpireResult{}, entity.ErrChainRepositoryNotConfigured
 	}
 	chainIDs, err := s.store.ListExpiredChainIDs(ctx, tx)
 	if err != nil {
-		return err
+		return ExpireResult{}, err
 	}
-	released := make([]int64, 0)
+	result := ExpireResult{}
 	for _, chainID := range chainIDs {
 		expired, err := s.store.ExpireProposalIfDue(ctx, tx, chainID)
 		if err != nil {
-			return err
+			return ExpireResult{}, err
 		}
 		if expired {
+			result.ExpiredChains = append(result.ExpiredChains, ExpiredChain{ChainID: chainID})
 			continue
 		}
 		requestIDs, expired, err := s.store.ExpireFrozenIfDue(ctx, tx, chainID)
 		if err != nil {
-			return err
+			return ExpireResult{}, err
 		}
 		if expired {
-			released = append(released, requestIDs...)
+			result.ExpiredChains = append(result.ExpiredChains, ExpiredChain{
+				ChainID:            chainID,
+				ReleasedRequestIDs: requestIDs,
+			})
+			result.ReleasedRequestIDs = append(result.ReleasedRequestIDs, requestIDs...)
 		}
 	}
-	if len(released) > 0 && s.rebuilder != nil {
-		return s.rebuilder.RebuildRequests(ctx, tx, released)
+	if len(result.ReleasedRequestIDs) > 0 && s.rebuilder != nil {
+		if err := s.rebuilder.RebuildRequests(ctx, tx, result.ReleasedRequestIDs); err != nil {
+			return ExpireResult{}, err
+		}
 	}
-	return nil
+	return result, nil
 }
 
 func (s *FreezeService) assertNoDoubleFreeze(ctx context.Context, tx database.Tx, requestIDs []int64) error {

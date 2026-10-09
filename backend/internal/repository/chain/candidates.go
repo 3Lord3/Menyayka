@@ -11,17 +11,23 @@ import (
 	"github.com/Avito-Team-Not-Found/menyayka/internal/repository"
 )
 
-// SaveCandidates atomically saves chains and participants in an already-open transaction.
-func (r *Postgres) SaveCandidates(ctx context.Context, tx database.Tx, drafts []entity.ChainDraft) error {
+// SaveCandidates saves chains and participants in an already-open transaction,
+// returning the IDs of chains that were actually inserted.
+func (r *Postgres) SaveCandidates(ctx context.Context, tx database.Tx, drafts []entity.ChainDraft) ([]int64, error) {
+	inserted := make([]int64, 0, len(drafts))
 	for _, draft := range drafts {
-		if err := saveCandidate(ctx, tx, draft); err != nil {
-			return err
+		chainID, created, err := saveCandidate(ctx, tx, draft)
+		if err != nil {
+			return nil, err
+		}
+		if created {
+			inserted = append(inserted, chainID)
 		}
 	}
-	return nil
+	return inserted, nil
 }
 
-func saveCandidate(ctx context.Context, tx database.Tx, draft entity.ChainDraft) error {
+func saveCandidate(ctx context.Context, tx database.Tx, draft entity.ChainDraft) (int64, bool, error) {
 	draft = canonicalizeDraft(draft)
 	clusterIDs := make([]int64, len(draft.Participants))
 	for i, participant := range draft.Participants {
@@ -30,7 +36,7 @@ func saveCandidate(ctx context.Context, tx database.Tx, draft entity.ChainDraft)
 	signature := chainSignature(clusterIDs)
 
 	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`, signature); err != nil {
-		return repository.MapDBErr(err)
+		return 0, false, repository.MapDBErr(err)
 	}
 
 	var exists bool
@@ -48,10 +54,10 @@ func saveCandidate(ctx context.Context, tx database.Tx, draft entity.ChainDraft)
 			  ) = $1::bigint[]
 		)
 	`, clusterIDs, len(clusterIDs)).Scan(&exists); err != nil {
-		return repository.MapDBErr(err)
+		return 0, false, repository.MapDBErr(err)
 	}
 	if exists {
-		return nil
+		return 0, false, nil
 	}
 
 	var chainID int64
@@ -60,14 +66,14 @@ func saveCandidate(ctx context.Context, tx database.Tx, draft entity.ChainDraft)
 		VALUES ('CANDIDATE', $1, $2)
 		RETURNING id
 	`, draft.Score, len(draft.Participants)).Scan(&chainID); err != nil {
-		return repository.MapDBErr(err)
+		return 0, false, repository.MapDBErr(err)
 	}
 
 	query, arguments := participantsInsert(chainID, draft)
 	if _, err := tx.Exec(ctx, query, arguments...); err != nil {
-		return repository.MapDBErr(err)
+		return 0, false, repository.MapDBErr(err)
 	}
-	return nil
+	return chainID, true, nil
 }
 
 func participantsInsert(chainID int64, draft entity.ChainDraft) (string, []any) {

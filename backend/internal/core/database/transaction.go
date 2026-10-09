@@ -14,9 +14,11 @@ import (
 // Tx is a PostgreSQL transaction exposed to repositories in an application scenario.
 type Tx = pgx.Tx
 
-// TransactionManager runs an application scenario in a single transaction.
+// TransactionManager runs an application scenario in a single transaction. The
+// callback receives a tx-scoped context so decorators (e.g. the realtime emitter)
+// can attach per-transaction state.
 type TransactionManager interface {
-	WithinTransaction(ctx context.Context, fn func(Tx) error) error
+	WithinTransaction(ctx context.Context, fn func(context.Context, Tx) error) error
 }
 
 // PostgresTransactionManager adapts Avito's go-transaction-manager to the current
@@ -37,14 +39,14 @@ func NewTransactionManager(pool *pgxpool.Pool) *PostgresTransactionManager {
 // WithinTransaction runs fn in a transaction created and finished by
 // go-transaction-manager. The library also handles rollback, panic, and nested
 // transactions correctly.
-func (m *PostgresTransactionManager) WithinTransaction(ctx context.Context, fn func(Tx) error) error {
+func (m *PostgresTransactionManager) WithinTransaction(ctx context.Context, fn func(context.Context, Tx) error) error {
 	return m.manager.Do(ctx, func(txCtx context.Context) error {
 		connection := trmpgx.DefaultCtxGetter.DefaultTrOrDB(txCtx, m.pool)
 		tx, ok := connection.(pgx.Tx)
 		if !ok {
 			return fmt.Errorf("transaction manager did not provide pgx transaction")
 		}
-		return fn(tx)
+		return fn(txCtx, tx)
 	})
 }
 

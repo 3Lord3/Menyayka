@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -71,6 +72,21 @@ type Config struct {
 	// Ranker* chain scoring: LightGBM (default) or formula (explicit baseline).
 	RankerMode      string
 	RankerModelPath string
+
+	// Realtime WebSocket.
+	WSHeartbeat       time.Duration // ping interval
+	WSWriteTimeout    time.Duration // write deadline
+	WSTicketTTL       time.Duration // ticket lifetime
+	WSAllowedOrigins  []string      // fail-closed: empty rejects every handshake
+	WSMaxConnections  int           // 0 = unlimited
+	WSMaxConnsPerUser int
+	WSMaxChainSubs    int           // chain subs per connection
+	WSSubTTL          time.Duration // idle subscription TTL
+	WSMsgRate         int           // messages per WSMsgRateWindow
+	WSMsgRateWindow   time.Duration
+	// WSAllowQueryTicket enables the ?ticket= query fallback (off: the ticket
+	// travels as a subprotocol and never reaches access logs).
+	WSAllowQueryTicket bool
 }
 
 // Load reads configuration from environment variables.
@@ -138,6 +154,56 @@ func Load() (*Config, error) {
 	if err != nil {
 		return nil, err
 	}
+	wsHeartbeat, err := envDurationOrDefault("WS_HEARTBEAT", 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	wsWriteTimeout, err := envDurationOrDefault("WS_WRITE_TIMEOUT", 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	wsTicketTTL, err := envDurationOrDefault("WS_TICKET_TTL", 30*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	wsMaxConnections, err := envIntOrDefault("WS_MAX_CONNECTIONS", 0)
+	if err != nil {
+		return nil, err
+	}
+	wsMaxConnsPerUser, err := envIntOrDefault("WS_MAX_CONNS_PER_USER", 5)
+	if err != nil {
+		return nil, err
+	}
+	wsMaxChainSubs, err := envIntOrDefault("WS_MAX_CHAIN_SUBS", 50)
+	if err != nil {
+		return nil, err
+	}
+	wsSubTTL, err := envDurationOrDefault("WS_SUB_TTL", 30*time.Minute)
+	if err != nil {
+		return nil, err
+	}
+	// Survives the subscription replay burst of a reconnecting client.
+	wsMsgRate, err := envIntOrDefault("WS_MSG_RATE", 100)
+	if err != nil {
+		return nil, err
+	}
+	wsMsgRateWindow, err := envDurationOrDefault("WS_MSG_RATE_WINDOW", 10*time.Second)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateRealtimeSettings(realtimeEnvSettings{
+		heartbeat:       wsHeartbeat,
+		writeTimeout:    wsWriteTimeout,
+		ticketTTL:       wsTicketTTL,
+		subTTL:          wsSubTTL,
+		msgRate:         wsMsgRate,
+		msgRateWindow:   wsMsgRateWindow,
+		maxConnections:  wsMaxConnections,
+		maxConnsPerUser: wsMaxConnsPerUser,
+		maxChainSubs:    wsMaxChainSubs,
+	}); err != nil {
+		return nil, err
+	}
 
 	return &Config{
 		DatabaseURL: dbURL,
@@ -174,6 +240,18 @@ func Load() (*Config, error) {
 		RankerMode:      rankerMode,
 		RankerModelPath: envOrDefault("RANKER_MODEL_PATH", "pkg/utils/ranker/models/ranker_v1.txt"),
 
+		WSHeartbeat:        wsHeartbeat,
+		WSWriteTimeout:     wsWriteTimeout,
+		WSTicketTTL:        wsTicketTTL,
+		WSAllowedOrigins:   parseCSV(os.Getenv("WS_ALLOWED_ORIGINS")),
+		WSMaxConnections:   wsMaxConnections,
+		WSMaxConnsPerUser:  wsMaxConnsPerUser,
+		WSMaxChainSubs:     wsMaxChainSubs,
+		WSSubTTL:           wsSubTTL,
+		WSMsgRate:          wsMsgRate,
+		WSMsgRateWindow:    wsMsgRateWindow,
+		WSAllowQueryTicket: envOrDefault("WS_ALLOW_QUERY_TICKET", "false") == "true",
+
 		MinIOEndpoint:       envOrDefault("MINIO_ENDPOINT", "localhost:9000"),
 		MinIOPublicEndpoint: envOrDefault("MINIO_PUBLIC_ENDPOINT", "localhost:9000"),
 		MinIOAccessKey:      envOrDefault("MINIO_ACCESS_KEY", ""),
@@ -189,6 +267,68 @@ func envOrDefault(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// parseCSV splits a comma-separated value, trimming whitespace and dropping
+// empties; an empty input yields nil.
+func parseCSV(v string) []string {
+	parts := strings.Split(v, ",")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		if p = strings.TrimSpace(p); p != "" {
+			out = append(out, p)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
+// realtimeEnvSettings holds parsed WS_* values for validation.
+type realtimeEnvSettings struct {
+	heartbeat       time.Duration
+	writeTimeout    time.Duration
+	ticketTTL       time.Duration
+	subTTL          time.Duration
+	msgRate         int
+	msgRateWindow   time.Duration
+	maxConnections  int
+	maxConnsPerUser int
+	maxChainSubs    int
+}
+
+// validateRealtimeSettings fails fast on a misconfigured WS_* value: a non-positive
+// duration would panic a ticker or silently disable a limiter.
+func validateRealtimeSettings(s realtimeEnvSettings) error {
+	for _, d := range []struct {
+		name  string
+		value time.Duration
+	}{
+		{"WS_HEARTBEAT", s.heartbeat},
+		{"WS_WRITE_TIMEOUT", s.writeTimeout},
+		{"WS_TICKET_TTL", s.ticketTTL},
+		{"WS_SUB_TTL", s.subTTL},
+		{"WS_MSG_RATE_WINDOW", s.msgRateWindow},
+	} {
+		if d.value <= 0 {
+			return fmt.Errorf("%s must be a positive duration, got %s", d.name, d.value)
+		}
+	}
+	for _, l := range []struct {
+		name  string
+		value int
+	}{
+		{"WS_MSG_RATE", s.msgRate},
+		{"WS_MAX_CONNECTIONS", s.maxConnections},
+		{"WS_MAX_CONNS_PER_USER", s.maxConnsPerUser},
+		{"WS_MAX_CHAIN_SUBS", s.maxChainSubs},
+	} {
+		if l.value < 0 {
+			return fmt.Errorf("%s must not be negative, got %d", l.name, l.value)
+		}
+	}
+	return nil
 }
 
 // envIntOrDefault falls back only if the variable is unset; an invalid value is a

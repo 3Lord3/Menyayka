@@ -9,9 +9,10 @@ import (
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/utils/ranker"
 )
 
-// CandidateStore persists found candidate chains.
+// CandidateStore persists found candidate chains; SaveCandidates returns the IDs
+// actually inserted.
 type CandidateStore interface {
-	SaveCandidates(ctx context.Context, tx database.Tx, drafts []entity.ChainDraft) error
+	SaveCandidates(ctx context.Context, tx database.Tx, drafts []entity.ChainDraft) ([]int64, error)
 }
 
 // ChainReader reads chains for a participant.
@@ -106,6 +107,11 @@ type LifecycleStore interface {
 	LoadActiveChainRequestIDs(ctx context.Context, tx database.Tx, chainID int64) ([]int64, error)
 }
 
+// ParticipantReader resolves chain participants for the realtime fan-out.
+type ParticipantReader interface {
+	ListChainParticipantUserIDs(ctx context.Context, chainID int64) ([]string, error)
+}
+
 // Repository composes the store interfaces for production wiring (*Postgres).
 // Prefer the narrow interfaces above for new dependencies.
 type Repository interface {
@@ -118,6 +124,7 @@ type Repository interface {
 	ReplacementStore
 	ScoreStore
 	LifecycleStore
+	ParticipantReader
 }
 
 // Notifier sends optional chain-event notifications.

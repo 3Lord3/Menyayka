@@ -5,6 +5,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/sirupsen/logrus"
 )
 
@@ -15,7 +16,7 @@ func (s *Service) ListReplacements(ctx context.Context, userID string, chainID i
 	if chainID <= 0 {
 		return nil, entity.ErrInvalidVoteTarget
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return nil, err
 	}
 	return s.repository.ListReplacementOptions(ctx, userID, chainID)
@@ -28,12 +29,12 @@ func (s *Service) SelectReplacement(ctx context.Context, userID string, chainID,
 	if chainID <= 0 || replacementRequestID <= 0 {
 		return entity.ErrInvalidVoteTarget
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return err
 	}
 	var proposalExpired bool
 	var replacementSelected bool
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, _, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -68,6 +69,12 @@ func (s *Service) SelectReplacement(ctx context.Context, userID string, chainID,
 				"request_id": replacementRequestID,
 			}).Error("failed to send replacement invitation")
 		}
+	}
+	if replacementSelected {
+		s.emit(ctx, realtime.EventChainReplacementSelected, chainEventPayload{
+			ChainID:              chainID,
+			ReplacementRequestID: replacementRequestID,
+		})
 	}
 	return nil
 }

@@ -151,8 +151,8 @@ func newService(store *fakeStore, embeddings *fakeEmbedding, matcher *fakeMatche
 
 type fakeTransactionManager struct{}
 
-func (m *fakeTransactionManager) WithinTransaction(_ context.Context, fn func(database.Tx) error) error {
-	return fn(nil)
+func (m *fakeTransactionManager) WithinTransaction(ctx context.Context, fn func(context.Context, database.Tx) error) error {
+	return fn(ctx, nil)
 }
 
 func (e *fakeEmbedding) Embed(_ context.Context, prompt string) ([]float32, error) {

@@ -12,7 +12,7 @@ func (s *Service) List(ctx context.Context, userID string) ([]entity.Chain, erro
 	if s.repository == nil {
 		return nil, entity.ErrChainRepositoryNotConfigured
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return nil, err
 	}
 	return s.repository.List(ctx, userID)
@@ -27,7 +27,7 @@ func (s *Service) ListForOffer(ctx context.Context, userID string, offerID int64
 	if offerID <= 0 {
 		return nil, entity.ErrExchangeOfferNotFound
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return nil, err
 	}
 	return s.repository.ListForOffer(ctx, userID, offerID)
@@ -39,7 +39,7 @@ func (s *Service) Get(ctx context.Context, userID string, chainID int64) (entity
 	if s.repository == nil {
 		return entity.Chain{}, entity.ErrChainRepositoryNotConfigured
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return entity.Chain{}, err
 	}
 	chain, err := s.repository.Get(ctx, userID, chainID)
@@ -56,15 +56,24 @@ func (s *Service) Get(ctx context.Context, userID string, chainID int64) (entity
 	return entity.Chain{}, err
 }
 
-func (s *Service) expireDue(ctx context.Context) error {
+func (s *Service) ExpireDue(ctx context.Context) error {
 	if s.freezer == nil {
 		return nil
 	}
 	if s.transactions == nil {
 		return entity.ErrChainRepositoryNotConfigured
 	}
-	return s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
-		return s.freezer.ExpireDue(ctx, tx)
+	return s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
+		result, err := s.freezer.ExpireDue(ctx, tx)
+		if err != nil {
+			return err
+		}
+		// Flushed by the tx-aware emitter after commit: one participant lookup per
+		// chain, and only for chains this call actually changed.
+		for _, expired := range result.ExpiredChains {
+			s.emitExpired(ctx, expired.ChainID, expired.ReleasedRequestIDs)
+		}
+		return nil
 	})
 }
 
