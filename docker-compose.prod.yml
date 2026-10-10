@@ -149,6 +149,10 @@ services:
       - MINIO_PUBLIC_USE_SSL=true
       - RANKER_MODE=${RANKER_MODE:-ml}
       - RANKER_MODEL_PATH=${RANKER_MODEL_PATH:-/models/ranker_v1.txt}
+      # Realtime WebSocket: fail-closed origin whitelist.
+      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS:-https://menyayka.tech}
+      - WS_HEARTBEAT=${WS_HEARTBEAT:-30s}
+      - WS_MAX_CONNS_PER_USER=${WS_MAX_CONNS_PER_USER:-5}
     restart: unless-stopped
     networks:
       - menyayka-network
@@ -161,6 +165,7 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
+        VITE_REALTIME_ENABLED: ${VITE_REALTIME_ENABLED:-true}
     restart: unless-stopped
     networks:
       - menyayka-network
