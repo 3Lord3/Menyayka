@@ -6,6 +6,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 )
 
 // SaveCandidates validates and saves candidate chains in the given transaction.
@@ -32,7 +33,18 @@ func (s *Service) SaveCandidates(ctx context.Context, tx database.Tx, drafts []e
 		}
 		return len(left) < len(right)
 	})
-	return s.repository.SaveCandidates(ctx, tx, canonical)
+	return s.saveCanonicalCandidates(ctx, tx, canonical)
+}
+
+func (s *Service) saveCanonicalCandidates(ctx context.Context, tx database.Tx, drafts []entity.ChainDraft) error {
+	created, err := s.repository.SaveCandidates(ctx, tx, drafts)
+	if err != nil {
+		return err
+	}
+	for _, chainID := range created {
+		s.emit(ctx, realtime.EventChainCreated, chainEventPayload{ChainID: chainID})
+	}
+	return nil
 }
 
 func normalizeDraft(draft entity.ChainDraft) (entity.ChainDraft, error) {

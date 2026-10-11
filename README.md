@@ -20,8 +20,10 @@ A web service for multi-party barter: a user lists an item and describes what th
 4. [Project structure](#project-structure)
 5. [Backend](#backend)
    - [Embeddings (TEI)](#embeddings-tei)
+   - [Realtime (WebSocket)](#realtime-websocket)
    - [API reference](#api-reference)
 6. [Frontend](#frontend)
+   - [Realtime (WebSocket)](#realtime-websocket-1)
 7. [Team](#team)
 
 ---
@@ -138,6 +140,7 @@ Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-dep
 | Object storage | MinIO (S3-compatible) |
 | Email | SMTP (password recovery) |
 | Tests | `testing`, httptest; E2E with build tag `e2e` |
+| Realtime | WebSocket (`github.com/coder/websocket`), in-memory hub |
 | Load testing | k6 |
 
 ### Frontend
@@ -152,6 +155,7 @@ Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-dep
 | Routing | React Router |
 | HTTP | Axios |
 | Quality | ESLint, Prettier, Vitest, Testing Library |
+| Realtime | native WebSocket API (fallback — polling) |
 
 ### Infrastructure
 
@@ -174,6 +178,7 @@ menyayka/
 │   │   ├── entity/              # domain entities and sentinel errors
 │   │   ├── handler/             # HTTP layer (user, item, exchange_offer, chain)
 │   │   ├── middleware/          # JWT auth
+│   │   ├── realtime/            # WebSocket hub, tickets, event fan-out
 │   │   ├── repository/          # DB access per feature (chain, cluster, item,
 │   │   │                        #   search, exchange_offer, user, …)
 │   │   ├── service/             # business logic (matching, clustering, chain, …)
@@ -189,7 +194,7 @@ menyayka/
 │   │   ├── pages/               # screens
 │   │   ├── features/            # auth, items, exchange-requests, chains, deal
 │   │   ├── entities/            # entity models and APIs
-│   │   └── shared/              # UI, api client, utilities
+│   │   └── shared/              # UI, api client, realtime client, utilities
 │   ├── Dockerfile
 │   ├── nginx.conf               # prod: static only (Caddy in front)
 │   └── nginx.local.conf         # local compose: static + /api + /s3
@@ -244,6 +249,18 @@ cd backend && swag init -g cmd/api/main.go -o docs --parseInternal
 
 See also: [CONTRIBUTING.md](CONTRIBUTING.md) · [Swagger UI](http://localhost:8080/swagger/index.html).
 
+### Realtime (WebSocket)
+
+Live chain/request/item updates are pushed over WebSocket (`/api/v1/ws`). Authentication uses
+a short-lived one-time ticket (`/api/v1/ws/ticket`, sent as a WebSocket subprotocol, never in a
+query string). Allowed origins are set via `WS_ALLOWED_ORIGINS` (comma-separated, fail-closed);
+WS_* settings are validated at startup — a non-positive duration or a negative limit is a
+startup error. Implementation is the `internal/realtime` package (hub, tickets, emitter).
+
+Known limitation: the hub and the one-time ticket store are in-process, so the backend
+runs as a **single replica**. Horizontal scaling requires either sticky sessions for
+`/ws*` or moving fan-out (and the ticket store) to Postgres `LISTEN/NOTIFY` / Redis PubSub.
+
 ---
 
 ## Frontend
@@ -276,6 +293,13 @@ npm run format:check
 npm run test          # Vitest
 npm run typecheck     # tsc --noEmit
 ```
+
+### Realtime (WebSocket)
+
+The client connects to `/api/v1/ws` via the native WebSocket API; the code lives in
+`shared/realtime` (client, `RealtimeProvider`, TanStack Query cache invalidation). The feature
+is gated by the `VITE_REALTIME_ENABLED` build arg: with `false` the app falls back to polling
+and returns to it automatically while the socket is down (e.g. a rejected handshake).
 
 ---
 

@@ -14,6 +14,7 @@ import {
 
 import { receivesItem, useChain, useReplacements } from '@entities/chain';
 
+import { useRealtimeChain } from '@shared/realtime';
 import { ErrorState } from '@shared/ui';
 
 import { ChainPageHeader } from './ChainPageHeader';
@@ -24,6 +25,7 @@ export function ChainDetailPage() {
   const { chainId: chainIdParam } = useParams<{ chainId: string }>();
   const navigate = useNavigate();
   const chainId = chainIdParam ? Number(chainIdParam) : undefined;
+  useRealtimeChain(chainId);
   const receiveRequestId = useReceiveOption();
   const { data: chain, isLoading: isChainLoading, isError, error, refetch } = useChain(chainId);
   const { confirmVote, isVoting } = useChainVote(refetch);

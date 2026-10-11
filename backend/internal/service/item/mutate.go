@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/validator"
 )
 
@@ -29,6 +30,8 @@ func (s *Service) Update(ctx context.Context, requesterID uuid.UUID, itemID int6
 		return nil, err
 	}
 
+	previousStatus := item.Status
+
 	if input.Title != nil {
 		item.Title = strings.TrimSpace(*input.Title)
 	}
@@ -44,7 +47,6 @@ func (s *Service) Update(ctx context.Context, requesterID uuid.UUID, itemID int6
 	if input.Status != nil {
 		item.Status = *input.Status
 	}
-
 	if input.Title != nil || input.Description != nil {
 		embeddingValue, err := s.embedItem(ctx, item.Title, item.Description)
 		if err != nil {
@@ -55,6 +57,10 @@ func (s *Service) Update(ctx context.Context, requesterID uuid.UUID, itemID int6
 
 	if err := s.repo.Update(ctx, item); err != nil {
 		return nil, err
+	}
+	// emit only on an actual status change; a plain edit would make every client refetch
+	if item.Status != previousStatus {
+		s.emitItemStatus(ctx, requesterID, item.ID, item.Status)
 	}
 
 	return item, nil
@@ -76,7 +82,25 @@ func (s *Service) Archive(ctx context.Context, requesterID uuid.UUID, itemID int
 		return err
 	}
 
-	return s.repo.UpdateStatus(ctx, itemID, entity.ItemStatusArchived)
+	if err := s.repo.UpdateStatus(ctx, itemID, entity.ItemStatusArchived); err != nil {
+		return err
+	}
+	s.emitItemStatus(ctx, requesterID, itemID, entity.ItemStatusArchived)
+	return nil
+}
+
+func (s *Service) emitItemStatus(ctx context.Context, ownerID uuid.UUID, itemID int64, status entity.ItemStatus) {
+	if s.emitter == nil {
+		return
+	}
+	s.emitter.Emit(ctx, realtime.Event{
+		Type:   realtime.EventItemStatusChanged,
+		UserID: ownerID.String(),
+		Payload: map[string]any{
+			"itemId": itemID,
+			"status": string(status),
+		},
+	})
 }
 
 func (s *Service) ensureNoHardReservation(ctx context.Context, itemID int64) error {

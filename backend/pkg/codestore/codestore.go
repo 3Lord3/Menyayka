@@ -45,3 +45,40 @@ func (s *Store) Delete(key string) {
 	defer s.mu.Unlock()
 	delete(s.data, key)
 }
+
+// Consume atomically returns the value for key and removes it; ok is false when the
+// key is missing or expired. Unlike Get+Delete it cannot return the same value twice.
+func (s *Store) Consume(key string) (string, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.data[key]
+	if !ok {
+		return "", false
+	}
+	delete(s.data, key)
+	if time.Now().After(e.expiresAt) {
+		return "", false
+	}
+	return e.value, true
+}
+
+// Sweep removes entries expired at now and returns how many.
+func (s *Store) Sweep(now time.Time) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	removed := 0
+	for key, e := range s.data {
+		if now.After(e.expiresAt) {
+			delete(s.data, key)
+			removed++
+		}
+	}
+	return removed
+}
+
+// Len reports the number of stored entries, including unswept expired ones.
+func (s *Store) Len() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.data)
+}

@@ -20,8 +20,10 @@
 4. [Структура проекта](#структура-проекта)
 5. [Backend](#backend)
    - [Embeddings (TEI)](#embeddings-tei)
+   - [Realtime (WebSocket)](#realtime-websocket)
    - [Справочник API](#справочник-api)
 6. [Frontend](#frontend)
+   - [Realtime (WebSocket)](#realtime-websocket-1)
 7. [Команда](#команда)
 
 ---
@@ -138,6 +140,7 @@ make loadtest        # k6: register → item → list → login
 | Объектное хранилище | MinIO (S3-совместимое) |
 | Почта | SMTP (восстановление пароля) |
 | Тесты | `testing`, httptest; E2E с build-tag `e2e` |
+| Realtime | WebSocket (`github.com/coder/websocket`), in-memory Hub |
 | Нагрузка | k6 |
 
 ### Frontend
@@ -152,6 +155,7 @@ make loadtest        # k6: register → item → list → login
 | Роутинг | React Router |
 | HTTP | Axios |
 | Качество | ESLint, Prettier, Vitest, Testing Library |
+| Realtime | нативный WebSocket API (fallback — polling) |
 
 ### Инфраструктура
 
@@ -174,6 +178,7 @@ menyayka/
 │   │   ├── entity/              # доменные сущности и sentinel-ошибки
 │   │   ├── handler/             # HTTP-слой (user, item, exchange_offer, chain)
 │   │   ├── middleware/          # JWT auth
+│   │   ├── realtime/            # WebSocket hub, тикеты, fan-out событий
 │   │   ├── repository/          # доступ к БД по фичам (chain, cluster, item,
 │   │   │                        #   search, exchange_offer, user, …)
 │   │   ├── service/             # бизнес-логика (matching, clustering, chain, …)
@@ -189,7 +194,7 @@ menyayka/
 │   │   ├── pages/               # экраны
 │   │   ├── features/            # auth, items, exchange-requests, chains, deal
 │   │   ├── entities/            # модели и API сущностей
-│   │   └── shared/              # UI, api-клиент, утилиты
+│   │   └── shared/              # UI, api-клиент, realtime-клиент, утилиты
 │   ├── Dockerfile
 │   ├── nginx.conf               # prod: только статика (Caddy спереди)
 │   └── nginx.local.conf         # local compose: статика + /api + /s3
@@ -243,6 +248,18 @@ cd backend && swag init -g cmd/api/main.go -o docs --parseInternal
 
 См. также: [CONTRIBUTING.md](CONTRIBUTING.md) · [Swagger UI](http://localhost:8080/swagger/index.html).
 
+### Realtime (WebSocket)
+
+Обновления цепочек/заявок/предметов отдаются по WebSocket (`/api/v1/ws`). Аутентификация —
+одноразовым короткоживущим тикетом (`/api/v1/ws/ticket`, передаётся subprotocol'ом, не в query).
+Допустимые origin'ы задаются `WS_ALLOWED_ORIGINS` (через запятую, fail-closed); WS_* значения
+валидируются на старте: неположительная длительность или отрицательный лимит — ошибка запуска.
+Реализация — пакет `internal/realtime` (Hub, тикеты, emitter).
+
+Известное ограничение: Hub и стор одноразовых тикетов живут в процессе, поэтому бэкенд
+работает **в одной реплике**. Горизонтальное масштабирование требует sticky-сессий для
+`/ws*` либо выноса fan-out (и стора тикетов) в Postgres `LISTEN/NOTIFY` / Redis PubSub.
+
 ---
 
 ## Frontend
@@ -275,6 +292,13 @@ npm run format:check
 npm run test          # Vitest
 npm run typecheck     # tsc --noEmit
 ```
+
+### Realtime (WebSocket)
+
+Клиент подключается к `/api/v1/ws` через нативный WebSocket API; код — в `shared/realtime`
+(клиент, `RealtimeProvider`, инвалидация кэша TanStack Query). Фича включается build-arg'ом
+`VITE_REALTIME_ENABLED`: при `false` приложение откатывается на polling и возвращается на него
+автоматически, пока сокет не поднят (например, handshake отклонён).
 
 ---
 

@@ -5,6 +5,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 )
 
 func (s *Service) Handoff(ctx context.Context, chainID, requestID int64) (FulfillmentResult, error) {
@@ -14,12 +15,12 @@ func (s *Service) Handoff(ctx context.Context, chainID, requestID int64) (Fulfil
 	if chainID <= 0 || requestID <= 0 {
 		return FulfillmentResult{}, entity.ErrHandoffRequestInvalid
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return FulfillmentResult{}, err
 	}
 
 	result := FulfillmentResult{ChainID: chainID, RequestID: requestID}
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, _, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -46,6 +47,11 @@ func (s *Service) Handoff(ctx context.Context, chainID, requestID int64) (Fulfil
 	if err != nil {
 		return FulfillmentResult{}, err
 	}
+	s.emit(ctx, realtime.EventChainFulfillmentChanged, chainEventPayload{
+		ChainID:   chainID,
+		RequestID: requestID,
+		Status:    string(result.Status),
+	})
 	return result, nil
 }
 
@@ -63,12 +69,12 @@ func (s *Service) ConfirmReceipt(
 	if chainID <= 0 || requestID <= 0 {
 		return FulfillmentResult{}, entity.ErrHandoffRequestInvalid
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return FulfillmentResult{}, err
 	}
 
 	result := FulfillmentResult{ChainID: chainID, RequestID: requestID}
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, _, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -113,6 +119,11 @@ func (s *Service) ConfirmReceipt(
 	if err != nil {
 		return FulfillmentResult{}, err
 	}
+	s.emit(ctx, realtime.EventChainFulfillmentChanged, chainEventPayload{
+		ChainID:   chainID,
+		RequestID: requestID,
+		Status:    string(result.Status),
+	})
 	return result, nil
 }
 

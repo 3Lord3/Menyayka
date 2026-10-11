@@ -22,6 +22,9 @@ import { useReplacementSelection } from './useReplacementSelection';
 
 const navigate = vi.fn();
 
+const realtime = vi.hoisted(() => ({ connected: false }));
+vi.mock('@shared/realtime', () => ({ useRealtimeConnected: () => realtime.connected }));
+
 vi.mock('react-router', async (importOriginal) => {
   const actual = await importOriginal<typeof import('react-router')>();
   return { ...actual, useNavigate: () => navigate };
@@ -90,6 +93,10 @@ function axiosError(status: number) {
   Object.assign(error, { response: { status } });
   return error;
 }
+
+// the realtime gate is asserted through the options the hook hands to the entity queries
+type ChainPollOptions = { refetchInterval: (chain: { status?: string }) => number | false };
+type PoolPollOptions = { refetchInterval?: number | false };
 
 let queryClient = createTestQueryClient();
 
@@ -458,5 +465,46 @@ describe('useReplacementSelection', () => {
         'exchange-options',
       ]),
     );
+  });
+
+  // while the socket is live the wait resolves by events; polling is a slow safety net
+  it('slows the waiting poll while the socket is live', () => {
+    realtime.connected = true;
+    try {
+      replacementInvited.set(1, OPTION);
+      mockedUseReplacements.mockReturnValue({
+        data: [OPTION],
+        isLoading: false,
+        isError: false,
+        refetch: refetchOptions,
+      } as never);
+
+      renderHook(() => useReplacementSelection(1), { wrapper });
+
+      const chainOptions = mockedUseChain.mock.calls.at(-1)?.[1] as ChainPollOptions;
+      expect(chainOptions.refetchInterval({ status: 'PROPOSED' })).toBe(5 * 60_000);
+      const poolOptions = mockedUseReplacements.mock.calls.at(-1)?.[1] as PoolPollOptions;
+      expect(poolOptions.refetchInterval).toBe(5 * 60_000);
+    } finally {
+      realtime.connected = false;
+    }
+  });
+
+  // a rejected handshake or a dropped socket must not stretch the refresh window
+  it('keeps the fast waiting poll while the socket is down', () => {
+    replacementInvited.set(1, OPTION);
+    mockedUseReplacements.mockReturnValue({
+      data: [OPTION],
+      isLoading: false,
+      isError: false,
+      refetch: refetchOptions,
+    } as never);
+
+    renderHook(() => useReplacementSelection(1), { wrapper });
+
+    const chainOptions = mockedUseChain.mock.calls.at(-1)?.[1] as ChainPollOptions;
+    expect(chainOptions.refetchInterval({ status: 'PROPOSED' })).toBe(15_000);
+    const poolOptions = mockedUseReplacements.mock.calls.at(-1)?.[1] as PoolPollOptions;
+    expect(poolOptions.refetchInterval).toBe(15_000);
   });
 });

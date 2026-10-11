@@ -1,23 +1,32 @@
 import { useQueries, useQuery } from '@tanstack/react-query';
 
+import { useRealtimeConnected } from '@shared/realtime';
+
 import { fetchChain, fetchExchangeOptions, fetchReplacements } from './api';
 import type { Chain } from './model';
 
 // live statuses are polled: otherwise the FROZEN transition after another's confirmation and the
-// neighbors' shipping on the deal screen show only after a manual refresh
+// neighbors' shipping on the deal screen show only after a manual refresh. With a push channel
+// this is only a slow safety net (events do the refreshing).
 const ACTUALIZATION_MS = 30_000;
+const REALTIME_FALLBACK_MS = 5 * 60_000;
+
+// The slow interval is safe only while the socket is actually up.
+function actualizationInterval(realtimeConnected: boolean): number {
+  return realtimeConnected ? REALTIME_FALLBACK_MS : ACTUALIZATION_MS;
+}
 
 function isPollableStatus(status: string | undefined): boolean {
   return status === 'PROPOSED' || status === 'FROZEN' || status === 'IN_PROGRESS';
 }
 
-export function chainQueryOptions(chainId?: number) {
+export function chainQueryOptions(chainId?: number, realtimeConnected = false) {
   return {
     queryKey: ['chains', chainId],
     queryFn: () => fetchChain(chainId as number),
     enabled: Boolean(chainId),
     refetchInterval: (query: { state: { data?: { status: string } } }) =>
-      isPollableStatus(query.state.data?.status) ? ACTUALIZATION_MS : false,
+      isPollableStatus(query.state.data?.status) ? actualizationInterval(realtimeConnected) : false,
     refetchOnWindowFocus: (query: { state: { data?: { status: string } } }) =>
       isPollableStatus(query.state.data?.status),
   };
@@ -30,7 +39,8 @@ export function useChain(
   } = {},
 ) {
   const { refetchInterval } = options;
-  const base = chainQueryOptions(chainId);
+  const realtimeConnected = useRealtimeConnected();
+  const base = chainQueryOptions(chainId, realtimeConnected);
   return useQuery({
     ...base,
     refetchInterval:
@@ -43,17 +53,21 @@ export function useChain(
 }
 
 export function useChains(chainIds: number[]) {
-  return useQueries({ queries: chainIds.map((chainId) => chainQueryOptions(chainId)) });
+  const realtimeConnected = useRealtimeConnected();
+  return useQueries({
+    queries: chainIds.map((chainId) => chainQueryOptions(chainId, realtimeConnected)),
+  });
 }
 
 export function useExchangeOptions(offerId?: number) {
+  const realtimeConnected = useRealtimeConnected();
   return useQuery({
     queryKey: ['exchange-options', offerId],
     queryFn: () => fetchExchangeOptions(offerId as number),
     enabled: Boolean(offerId),
     refetchInterval: (query) =>
       (query.state.data ?? []).some((entry) => entry.status === 'PROPOSED')
-        ? ACTUALIZATION_MS
+        ? actualizationInterval(realtimeConnected)
         : false,
     refetchOnWindowFocus: (query) =>
       (query.state.data ?? []).some((entry) => entry.status === 'PROPOSED'),

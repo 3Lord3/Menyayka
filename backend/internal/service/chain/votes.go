@@ -7,6 +7,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/utils/ranker"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/validator"
 )
@@ -21,7 +22,7 @@ func (s *Service) Vote(ctx context.Context, userID string, chainID int64, input 
 	if err := validator.Validate(&input); err != nil {
 		return entity.ChainVote{}, err
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return entity.ChainVote{}, err
 	}
 	result := entity.ChainVote{
@@ -30,7 +31,7 @@ func (s *Service) Vote(ctx context.Context, userID string, chainID int64, input 
 		TargetRequestID: input.TargetRequestID,
 		Vote:            entity.VotePending,
 	}
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, length, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -80,6 +81,12 @@ func (s *Service) Vote(ctx context.Context, userID string, chainID int64, input 
 	if err != nil {
 		return entity.ChainVote{}, err
 	}
+	s.emit(ctx, realtime.EventChainVoteChanged, chainEventPayload{
+		ChainID:         chainID,
+		RequestID:       input.RequestID,
+		TargetRequestID: input.TargetRequestID,
+		Status:          string(result.ChainStatus),
+	})
 	return result, nil
 }
 
@@ -96,11 +103,11 @@ func (s *Service) WithdrawVote(ctx context.Context, userID string, chainID int64
 	if err := validator.Validate(&input); err != nil {
 		return err
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return err
 	}
 
-	return s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, length, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -121,6 +128,17 @@ func (s *Service) WithdrawVote(ctx context.Context, userID string, chainID int64
 		}
 		return s.refreshScore(ctx, tx, chainID, entity.ChainStatusCandidate, ranker.EventDecline)
 	})
+	if err != nil {
+		return err
+	}
+	s.emit(ctx, realtime.EventChainVoteChanged, chainEventPayload{
+		ChainID:         chainID,
+		RequestID:       input.RequestID,
+		TargetRequestID: input.TargetRequestID,
+		// same payload shape as Vote: a withdrawn response returns the chain to CANDIDATE
+		Status: string(entity.ChainStatusCandidate),
+	})
+	return nil
 }
 
 func findPendingCycle(length int, edges []entity.VoteEdge) []int64 {

@@ -4,6 +4,8 @@ import { useQueryClient } from '@tanstack/react-query';
 
 import type { ChainStatus } from '@entities/chain';
 
+import { useRealtimeConnected } from '@shared/realtime';
+
 // margin for client/server clock skew: without it freeze_deadline_at <= NOW()
 // on the backend won't hold yet and the rollback waits until the next poll
 const EXPIRY_SLACK_MS = 2_000;
@@ -20,6 +22,8 @@ export interface ProposalExpiryState {
 // The hook hits the detail at the deadline and invalidates the list after it moves on.
 export function useProposalExpiry(states: ProposalExpiryState[]): void {
   const queryClient = useQueryClient();
+  // with a push channel the worker emits chain.expired; the timer is the fallback while down
+  const realtimeConnected = useRealtimeConnected();
   // the array is rebuilt every render: effects hook onto its value, not its reference
   const signature = states
     .map((state) =>
@@ -37,6 +41,7 @@ export function useProposalExpiry(states: ProposalExpiryState[]): void {
   const seenDetail = useRef(new Map<number, ChainStatus>());
 
   useEffect(() => {
+    if (realtimeConnected) return;
     let stale = false;
     // not some(): it would stop the scan on the first stale chain and forget the other statuses
     latest.current.forEach((state) => {
@@ -47,9 +52,10 @@ export function useProposalExpiry(states: ProposalExpiryState[]): void {
       if (state.listStatus === 'PROPOSED' || previous === 'PROPOSED') stale = true;
     });
     if (stale) void queryClient.invalidateQueries({ queryKey: ['exchange-options'] });
-  }, [signature, queryClient]);
+  }, [signature, queryClient, realtimeConnected]);
 
   useEffect(() => {
+    if (realtimeConnected) return;
     const timers = latest.current
       .filter((state) => state.detailStatus === 'PROPOSED')
       .map((state) => {
@@ -67,5 +73,5 @@ export function useProposalExpiry(states: ProposalExpiryState[]): void {
         if (timer !== undefined) clearTimeout(timer);
       });
     };
-  }, [signature, queryClient]);
+  }, [signature, queryClient, realtimeConnected]);
 }

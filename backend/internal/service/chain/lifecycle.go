@@ -5,6 +5,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 )
 
 // ListChainsContainingRequest returns chains involving the request.
@@ -23,12 +24,18 @@ func (s *Service) DeleteRequestParticipation(ctx context.Context, tx database.Tx
 	return s.repository.DeleteRequestParticipation(ctx, tx, requestID)
 }
 
-// DeleteChain deletes a chain entirely via cascade.
+// DeleteChain deletes a chain via cascade and notifies its participants (resolved
+// before the rows disappear).
 func (s *Service) DeleteChain(ctx context.Context, tx database.Tx, chainID int64) error {
 	if s.repository == nil {
 		return entity.ErrChainRepositoryNotConfigured
 	}
-	return s.repository.DeleteChain(ctx, tx, chainID)
+	recipients := s.participantUserIDs(ctx, chainID)
+	if err := s.repository.DeleteChain(ctx, tx, chainID); err != nil {
+		return err
+	}
+	s.emitTo(ctx, realtime.EventChainRemoved, chainEventPayload{ChainID: chainID}, recipients)
+	return nil
 }
 
 // LoadChainRequestIDs returns the chain's participant requests.

@@ -8,6 +8,7 @@ import { ReplacementCandidateCard, useReplacementSelection } from '@features/cha
 import { showsScore, type Chain, type ReplacementOption } from '@entities/chain';
 
 import { plural } from '@shared/lib/plural';
+import { useRealtimeChain } from '@shared/realtime';
 import { EmptyState, ErrorState, ProbabilityBadge } from '@shared/ui';
 
 import { ChainPageHeader } from './ChainPageHeader';
@@ -21,6 +22,7 @@ export function ChainReplacementPage() {
   const { chainId: chainIdParam } = useParams<{ chainId: string }>();
   const navigate = useNavigate();
   const chainId = chainIdParam ? Number(chainIdParam) : undefined;
+  useRealtimeChain(chainId);
   const {
     options,
     isLoading,

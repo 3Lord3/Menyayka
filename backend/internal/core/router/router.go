@@ -17,6 +17,7 @@ import (
 	itemHandler "github.com/Avito-Team-Not-Found/menyayka/internal/handler/item"
 	userHandler "github.com/Avito-Team-Not-Found/menyayka/internal/handler/user"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/middleware"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 )
 
 func New(
@@ -26,6 +27,7 @@ func New(
 	exchangeOfferH *exchangeOfferHandler.Handler,
 	itemH *itemHandler.Handler,
 	chainH *chainHandler.Handler,
+	realtimeH *realtime.Handler,
 ) *gin.Engine {
 	engine := gin.New()
 	engine.Use(gin.Logger())
@@ -98,6 +100,10 @@ func New(
 		// Handoff callback (MVP without external auth; protect before production).
 		integrations := api.Group("/integrations")
 		integrations.POST("/avito/handoffs", chainH.Handoff)
+
+		// /ws authenticates by ticket; /ws/ticket requires a session.
+		api.GET("/ws", realtimeH.Connect)
+		api.GET("/ws/ticket", middleware.Auth(tokenParser), realtimeH.Ticket)
 
 		// recovery without JWT: the user is not logged in yet
 		recovery := api.Group("/account/password-recovery")

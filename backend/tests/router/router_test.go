@@ -69,6 +69,7 @@ func newTestEngine() *gin.Engine {
 		exchangeOfferHandler.NewHandler(stubExchangeOfferService{}),
 		itemHandler.NewHandler(stubItemService{}),
 		chainHandler.NewHandler(stubChainService{}),
+		nil,
 	)
 }
 

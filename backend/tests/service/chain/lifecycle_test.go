@@ -50,7 +50,7 @@ func TestFreezeRequiresRepository(t *testing.T) {
 	if err := freezer.Freeze(context.Background(), nil, 1); !errors.Is(err, entity.ErrChainRepositoryNotConfigured) {
 		t.Fatalf("Freeze() error = %v", err)
 	}
-	if err := freezer.ExpireDue(context.Background(), nil); !errors.Is(err, entity.ErrChainRepositoryNotConfigured) {
+	if _, err := freezer.ExpireDue(context.Background(), nil); !errors.Is(err, entity.ErrChainRepositoryNotConfigured) {
 		t.Fatalf("ExpireDue() error = %v", err)
 	}
 }

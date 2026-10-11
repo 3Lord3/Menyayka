@@ -6,6 +6,7 @@ import (
 
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/utils/ranker"
 	"github.com/sirupsen/logrus"
 )
@@ -17,14 +18,14 @@ func (s *Service) Confirm(ctx context.Context, userID string, chainID int64) (en
 	if chainID <= 0 {
 		return entity.ChainStatus(""), entity.ErrInvalidVoteTarget
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return entity.ChainStatus(""), err
 	}
 
 	var resultStatus entity.ChainStatus
 	var proposalExpired bool
 	var frozenNow bool
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, length, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -34,6 +35,9 @@ func (s *Service) Confirm(ctx context.Context, userID string, chainID int64) (en
 			return err
 		}
 		if expired {
+			// Deadline elapsed between the pre-check and the row lock: still announce it,
+			// as the expiry worker will never see this chain overdue again.
+			s.emitExpired(ctx, chainID, nil)
 			proposalExpired = true
 			return nil
 		}
@@ -103,6 +107,7 @@ func (s *Service) Confirm(ctx context.Context, userID string, chainID int64) (en
 				Error("failed to send frozen chain notifications")
 		}
 	}
+	s.emit(ctx, realtime.EventChainStatusChanged, chainEventPayload{ChainID: chainID, Status: string(resultStatus)})
 	return resultStatus, nil
 }
 
@@ -119,7 +124,7 @@ func (s *Service) Unconfirm(ctx context.Context, userID string, chainID int64) (
 	}
 	result := entity.ChainStatusProposed
 	var expired bool
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, _, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -128,8 +133,12 @@ func (s *Service) Unconfirm(ctx context.Context, userID string, chainID int64) (
 			return entity.ErrChainNotProposed
 		}
 		expired, err = s.repository.ExpireProposalIfDue(ctx, tx, chainID)
-		if err != nil || expired {
+		if err != nil {
 			return err
+		}
+		if expired {
+			s.emitExpired(ctx, chainID, nil)
+			return nil
 		}
 		requestID, targetID, err := s.repository.FindParticipantEdge(ctx, tx, chainID, userID)
 		if err != nil {
@@ -154,6 +163,7 @@ func (s *Service) Unconfirm(ctx context.Context, userID string, chainID int64) (
 	if expired {
 		return "", entity.ErrChainConfirmationExpired
 	}
+	s.emit(ctx, realtime.EventChainStatusChanged, chainEventPayload{ChainID: chainID, Status: string(result)})
 	return result, nil
 }
 
@@ -167,11 +177,11 @@ func (s *Service) Think(ctx context.Context, userID string, chainID int64) error
 	if chainID <= 0 {
 		return entity.ErrInvalidVoteTarget
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return err
 	}
 	var proposalExpired bool
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, _, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -181,6 +191,7 @@ func (s *Service) Think(ctx context.Context, userID string, chainID int64) error
 			return err
 		}
 		if expired {
+			s.emitExpired(ctx, chainID, nil)
 			proposalExpired = true
 			return nil
 		}
@@ -199,6 +210,7 @@ func (s *Service) Think(ctx context.Context, userID string, chainID int64) error
 	if proposalExpired {
 		return entity.ErrChainConfirmationExpired
 	}
+	s.emit(ctx, realtime.EventChainStatusChanged, chainEventPayload{ChainID: chainID, Status: string(entity.ChainStatusProposed)})
 	return nil
 }
 
@@ -213,13 +225,13 @@ func (s *Service) Decline(ctx context.Context, userID string, chainID int64) (bo
 	if chainID <= 0 {
 		return false, "", entity.ErrInvalidVoteTarget
 	}
-	if err := s.expireDue(ctx); err != nil {
+	if err := s.ExpireDue(ctx); err != nil {
 		return false, "", err
 	}
 	var replacementAvailable bool
 	resultStatus := entity.ChainStatusCandidate
 	var proposalExpired bool
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		status, chainLength, err := s.repository.LockForVote(ctx, tx, chainID)
 		if err != nil {
 			return err
@@ -229,6 +241,7 @@ func (s *Service) Decline(ctx context.Context, userID string, chainID int64) (bo
 			return err
 		}
 		if expired {
+			s.emitExpired(ctx, chainID, nil)
 			proposalExpired = true
 			return nil
 		}
@@ -262,6 +275,12 @@ func (s *Service) Decline(ctx context.Context, userID string, chainID int64) (bo
 	})
 	if proposalExpired && err == nil {
 		err = entity.ErrChainConfirmationExpired
+	}
+	if err == nil {
+		s.emit(ctx, realtime.EventChainStatusChanged, chainEventPayload{ChainID: chainID, Status: string(resultStatus)})
+		if replacementAvailable {
+			s.emit(ctx, realtime.EventChainReplacementAvailable, chainEventPayload{ChainID: chainID})
+		}
 	}
 	return replacementAvailable, resultStatus, err
 }

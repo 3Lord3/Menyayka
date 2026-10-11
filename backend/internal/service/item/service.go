@@ -3,6 +3,7 @@ package item
 import (
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/infrastructure/embedding"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 )
 
 const maxImageSize = 5 << 20
@@ -50,8 +51,15 @@ type Service struct {
 	repo      ItemRepository
 	embedding embedding.Client
 	storage   Storage
+	emitter   realtime.Emitter
 }
 
 func NewService(repo ItemRepository, embeddingClient embedding.Client, storage Storage) *Service {
 	return &Service{repo: repo, embedding: embeddingClient, storage: storage}
+}
+
+// WithRealtimeEmitter sets the realtime emitter.
+func (s *Service) WithRealtimeEmitter(emitter realtime.Emitter) *Service {
+	s.emitter = emitter
+	return s
 }

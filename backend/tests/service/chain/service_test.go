@@ -138,6 +138,7 @@ type fakeRepository struct {
 	declinedRequestID       int64
 	fastReplacementEligible bool
 	selectedRequestID       int64
+	createdChains           []int64
 	handoffStatus           entity.RequestStatus
 	receiptStatus           entity.RequestStatus
 	receiptErr              error
@@ -153,9 +154,9 @@ func (r *fakeRepository) HasDeadlineEvent(_ context.Context, _ string, _ int64) 
 	return false, nil
 }
 
-func (r *fakeRepository) SaveCandidates(_ context.Context, _ database.Tx, drafts []entity.ChainDraft) error {
+func (r *fakeRepository) SaveCandidates(_ context.Context, _ database.Tx, drafts []entity.ChainDraft) ([]int64, error) {
 	r.saved = append(r.saved, drafts...)
-	return nil
+	return r.createdChains, nil
 }
 
 func (r *fakeRepository) List(_ context.Context, _ string) ([]entity.Chain, error) {
@@ -329,6 +330,10 @@ func (r *fakeRepository) LoadChainRequestIDs(_ context.Context, _ database.Tx, _
 	return r.requestIDs, nil
 }
 
+func (r *fakeRepository) ListChainParticipantUserIDs(_ context.Context, _ int64) ([]string, error) {
+	return nil, nil
+}
+
 func (r *fakeRepository) LoadActiveChainRequestIDs(ctx context.Context, tx database.Tx, chainID int64) ([]int64, error) {
 	return r.LoadChainRequestIDs(ctx, tx, chainID)
 }
@@ -385,8 +390,8 @@ func (r *fakeRepository) CompleteChain(_ context.Context, _ database.Tx, _ int64
 
 type fakeTransactionManager struct{}
 
-func (fakeTransactionManager) WithinTransaction(_ context.Context, fn func(database.Tx) error) error {
-	return fn(nil)
+func (fakeTransactionManager) WithinTransaction(ctx context.Context, fn func(context.Context, database.Tx) error) error {
+	return fn(ctx, nil)
 }
 
 func (r *fakeRepository) ListChainsContainingRequest(_ context.Context, _ database.Tx, _ int64) ([]int64, error) {
@@ -588,7 +593,7 @@ func TestExpireDueRebuildsRequestsReleasedFromFrozenChain(t *testing.T) {
 	rebuilder := &fakeRebuilder{}
 	freezer := chainservice.NewFreezeService(repository, rebuilder)
 
-	if err := freezer.ExpireDue(context.Background(), nil); err != nil {
+	if _, err := freezer.ExpireDue(context.Background(), nil); err != nil {
 		t.Fatalf("ExpireDue() error = %v", err)
 	}
 	want := []int64{10, 20, 30}
@@ -610,7 +615,7 @@ func TestExpireDueDoesNotRebuildRolledBackProposal(t *testing.T) {
 	rebuilder := &fakeRebuilder{}
 	freezer := chainservice.NewFreezeService(repository, rebuilder)
 
-	if err := freezer.ExpireDue(context.Background(), nil); err != nil {
+	if _, err := freezer.ExpireDue(context.Background(), nil); err != nil {
 		t.Fatalf("ExpireDue() error = %v", err)
 	}
 	if len(rebuilder.rebuilt) != 0 {

@@ -237,3 +237,49 @@ func (r *Postgres) HasDeadlineEvent(ctx context.Context, userID string, chainID 
 	}
 	return exists, nil
 }
+
+// ListChainParticipantUserIDs returns the distinct owner user IDs of the chain's
+// participant requests.
+func (r *Postgres) ListChainParticipantUserIDs(ctx context.Context, chainID int64) ([]string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT DISTINCT eo.user_id::text
+		FROM chain_participants AS cp
+		JOIN exchange_offers AS eo ON eo.id = cp.request_id
+		WHERE cp.chain_id = $1
+	`, chainID)
+	if err != nil {
+		return nil, fmt.Errorf("list chain participant user ids: %w", err)
+	}
+	defer rows.Close()
+
+	userIDs := make([]string, 0)
+	for rows.Next() {
+		var userID string
+		if err := rows.Scan(&userID); err != nil {
+			return nil, fmt.Errorf("scan chain participant user id: %w", err)
+		}
+		userIDs = append(userIDs, userID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate chain participant user ids: %w", err)
+	}
+	return userIDs, nil
+}
+
+// IsChainParticipant reports whether the user owns a request in the chain
+// (the same rule as GET /chains/{id}).
+func (r *Postgres) IsChainParticipant(ctx context.Context, userID string, chainID int64) (bool, error) {
+	var exists bool
+	err := r.pool.QueryRow(ctx, `
+		SELECT EXISTS (
+			SELECT 1
+			FROM chain_participants AS cp
+			JOIN exchange_offers AS eo ON eo.id = cp.request_id
+			WHERE cp.chain_id = $1 AND eo.user_id = $2::uuid
+		)
+	`, chainID, userID).Scan(&exists)
+	if err != nil {
+		return false, fmt.Errorf("check chain participation: %w", err)
+	}
+	return exists, nil
+}

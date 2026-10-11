@@ -13,12 +13,24 @@ internal/
   service/<feature>/      # business logic; contracts.go — interfaces of what it needs
   handler/<feature>/      # gin HTTP handlers; contracts.go — interfaces the service provides
   infrastructure/         # technical clients without business logic (mailer, codestore, jwt, embeddings)
+  realtime/               # WebSocket hub, one-time tickets, event fan-out (backend side of the realtime feature)
   middleware/             # cross-cutting gin middleware (currently Auth / JWT)
   api/                    # common HTTP response/error format (internal/api/response.go)
   core/                   # config, logger, DB pool, router
 ```
 
 An upper layer depends on a lower one only through an interface from its own `contracts.go`; the implementation is passed explicitly as a constructor argument (manual dependency injection, no DI framework). See `internal/service/user` and `internal/handler/user`.
+
+## Realtime (WebSocket)
+
+`internal/realtime` is the backend side of the realtime feature: an in-memory `Hub`, the WebSocket upgrade at `/api/v1/ws` and one-time ticket issuance at `/api/v1/ws/ticket`. The websocket transport is [`github.com/coder/websocket`](https://github.com/coder/websocket). The client (native WebSocket, gated by the `VITE_REALTIME_ENABLED` build arg) lives in `frontend/src/shared/realtime`.
+
+Conventions:
+
+- The client authenticates with a short-lived one-time ticket sent as a WebSocket subprotocol, never in a query string. Set `WS_ALLOWED_ORIGINS` on the backend (comma-separated, fail-closed).
+- When `VITE_REALTIME_ENABLED` is `false` (or while the socket is down) the app falls back to polling.
+- The hub and the ticket store are in-process, so the backend runs as a **single replica**. Horizontal scaling needs sticky sessions for `/ws*` or moving fan-out to Postgres `LISTEN/NOTIFY` / Redis PubSub.
+- Tests for the package live next to it (e.g. `internal/realtime/hub_test.go`, `internal/realtime/handler_test.go`).
 
 ## Error handling
 

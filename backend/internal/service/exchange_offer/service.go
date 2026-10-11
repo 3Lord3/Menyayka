@@ -8,6 +8,7 @@ import (
 	"github.com/Avito-Team-Not-Found/menyayka/internal/core/database"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/entity"
 	"github.com/Avito-Team-Not-Found/menyayka/internal/infrastructure/embedding"
+	"github.com/Avito-Team-Not-Found/menyayka/internal/realtime"
 	"github.com/Avito-Team-Not-Found/menyayka/pkg/validator"
 )
 
@@ -33,6 +34,7 @@ type Service struct {
 	embedding    embedding.Client
 	matching     MatchingFacade
 	transactions database.TransactionManager
+	emitter      realtime.Emitter
 }
 
 func NewService(
@@ -47,6 +49,39 @@ func NewService(
 		matching:     matchingFacade,
 		transactions: transactionManager,
 	}
+}
+
+// WithRealtimeEmitter sets the realtime emitter.
+func (s *Service) WithRealtimeEmitter(emitter realtime.Emitter) *Service {
+	s.emitter = emitter
+	return s
+}
+
+func (s *Service) emitRequestStatus(ctx context.Context, userID string, requestID int64, status entity.RequestStatus) {
+	if s.emitter == nil {
+		return
+	}
+	s.emitter.Emit(ctx, realtime.Event{
+		Type:   realtime.EventRequestStatusChanged,
+		UserID: userID,
+		Payload: map[string]any{
+			"requestId": requestID,
+			"status":    string(status),
+		},
+	})
+}
+
+// emitRequestUpdated notifies an edit that keeps the status: reporting it as a
+// status change would promise a transition that never happened.
+func (s *Service) emitRequestUpdated(ctx context.Context, userID string, requestID int64) {
+	if s.emitter == nil {
+		return
+	}
+	s.emitter.Emit(ctx, realtime.Event{
+		Type:    realtime.EventRequestUpdated,
+		UserID:  userID,
+		Payload: map[string]any{"requestId": requestID},
+	})
 }
 
 func (s *Service) Create(ctx context.Context, userID string, input CreateInput) (entity.ExchangeOffer, error) {
@@ -64,7 +99,7 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 	}
 
 	var created entity.ExchangeOffer
-	err = s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err = s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		var createErr error
 		created, createErr = s.repository.Create(ctx, tx, entity.ExchangeOffer{
 			UserID:            userID,
@@ -84,6 +119,7 @@ func (s *Service) Create(ctx context.Context, userID string, input CreateInput) 
 	if err != nil {
 		return entity.ExchangeOffer{}, err
 	}
+	s.emitRequestStatus(ctx, userID, created.ID, created.Status)
 
 	return created, nil
 }
@@ -111,7 +147,7 @@ func (s *Service) Update(ctx context.Context, userID string, requestID int64, in
 	}
 
 	var updated entity.ExchangeOffer
-	err = s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err = s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		var updateErr error
 		updated, updateErr = s.repository.Update(ctx, tx, entity.ExchangeOffer{
 			ID:                requestID,
@@ -130,6 +166,8 @@ func (s *Service) Update(ctx context.Context, userID string, requestID int64, in
 	if err != nil {
 		return entity.ExchangeOffer{}, err
 	}
+	// unchanged status: an edit, not a transition
+	s.emitRequestUpdated(ctx, userID, updated.ID)
 
 	return updated, nil
 }
@@ -144,7 +182,7 @@ func (s *Service) Delete(ctx context.Context, userID string, requestID, version 
 	}
 
 	var archived entity.ExchangeOffer
-	err := s.transactions.WithinTransaction(ctx, func(tx database.Tx) error {
+	err := s.transactions.WithinTransaction(ctx, func(ctx context.Context, tx database.Tx) error {
 		var archiveErr error
 		archived, archiveErr = s.repository.Archive(ctx, tx, userID, requestID, version)
 		if archiveErr != nil {
@@ -155,6 +193,7 @@ func (s *Service) Delete(ctx context.Context, userID string, requestID, version 
 	if err != nil {
 		return err
 	}
+	s.emitRequestStatus(ctx, userID, archived.ID, archived.Status)
 
 	return nil
 }
