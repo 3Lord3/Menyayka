@@ -48,7 +48,9 @@ services:
 
   minio:
     container_name: menyayka-minio
-    image: minio/minio:RELEASE.2025-04-08T15-41-24Z
+    # minio/minio was removed from Docker Hub; elestio/minio mirrors the official
+    # image (same entrypoint) and bundles mc, so it also serves minio-init.
+    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
     environment:
       - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
       - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
@@ -66,7 +68,7 @@ services:
       - menyayka-network
 
   minio-init:
-    image: minio/mc:RELEASE.2025-04-08T15-39-49Z
+    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
     depends_on:
       minio:
         condition: service_healthy
