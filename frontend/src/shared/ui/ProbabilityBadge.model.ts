@@ -1,8 +1,8 @@
 import type { GlobalToken } from 'antd';
 
-export type ProbabilityLevel = 'high' | 'medium' | 'low';
+type ProbabilityLevel = 'high' | 'medium' | 'low';
 
-export type ProbabilityMeta = {
+type ProbabilityMeta = {
   label: string;
   token: keyof GlobalToken;
 };

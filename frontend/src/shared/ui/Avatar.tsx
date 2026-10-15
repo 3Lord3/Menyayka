@@ -2,7 +2,7 @@ import { theme } from 'antd';
 
 import './ui.scss';
 
-export type AvatarSize = 'sm' | 'md' | 'lg';
+type AvatarSize = 'sm' | 'md' | 'lg';
 
 const SIZE_PX: Record<AvatarSize, number> = { sm: 24, md: 40, lg: 64 };
 const FONT_PX: Record<AvatarSize, number> = { sm: 10, md: 14, lg: 20 };

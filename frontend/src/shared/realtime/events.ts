@@ -30,7 +30,7 @@ export interface RealtimeEvent {
   at?: string;
 }
 
-export type RealtimeAction = 'subscribed' | 'unsubscribed' | 'pong' | 'error';
+type RealtimeAction = 'subscribed' | 'unsubscribed' | 'pong' | 'error';
 
 export interface RealtimeControl {
   action: RealtimeAction;

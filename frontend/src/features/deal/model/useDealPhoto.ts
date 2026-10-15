@@ -5,13 +5,13 @@ import { jsonStorage } from '@shared/lib/storage';
 const MAX_SIDE = 512;
 const JPEG_QUALITY = 0.7;
 
-export function photoKey(chainId: number, requestId: number): string {
+function photoKey(chainId: number, requestId: number): string {
   return `deal:photo:${chainId}:${requestId}`;
 }
 
 // Compress the package photo before sending: canvas shrinks the file to 512px on the long
 // side and outputs JPEG 0.7 — otherwise the shot won't fit the localStorage quota
-export async function compressImageFile(file: File): Promise<string> {
+async function compressImageFile(file: File): Promise<string> {
   const url = URL.createObjectURL(file);
   try {
     const image = await loadImage(url);

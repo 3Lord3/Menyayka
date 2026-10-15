@@ -1,7 +1,7 @@
 // The backend has no category-dictionary endpoint: the category is stored as text, so the list
 // lives here. Free input isn't allowed — clustering compares categories by exact string equality,
 // and "Electronics" and "electronics" would end up in different candidate pools.
-export const ITEM_CATEGORIES = [
+const ITEM_CATEGORIES = [
   'Одежда, обувь, аксессуары',
   'Часы и украшения',
   'Сумки и рюкзаки',
@@ -40,9 +40,6 @@ export const ITEM_CATEGORIES = [
   'Аудио- и видеотехника',
   'Аудио- и видеотехника для авто',
 ] as const;
-
-// the DB column is VARCHAR(100); the backend doesn't validate overflow and returns 500
-export const CATEGORY_MAX_LENGTH = 100;
 
 // SCRUM-52 requirement; records created before it come with a shorter description, so the
 // item and request forms validate length explicitly — antd doesn't validate initialValues
