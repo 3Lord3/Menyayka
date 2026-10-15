@@ -39,7 +39,6 @@ func NewChainScoreCalculator(cfg RankerConfig) *ChainScoreCalculator {
 //
 // then clamp to [0,1] and round to 4 decimals.
 func (c *ChainScoreCalculator) Score(s ChainState) (float64, error) {
-	// PrevScore isn't used as +=/-=; it remains an input to the rules/normalization.
 	feats, err := ExtractFeatures(s, c.cfg)
 	if err != nil {
 		return 0, err
@@ -72,29 +71,10 @@ func (c *ChainScoreCalculator) ScoreForAdd(s ChainState) (float64, error) {
 	return c.Score(s)
 }
 
-// ScoreForDelete reflects deleting a request -> recomputes M, R, L without it.
-// The inverse of Add: pass the state with the participant already removed.
-func (c *ChainScoreCalculator) ScoreForDelete(s ChainState) (float64, error) {
-	s.Event = EventDelete
-	return c.Score(s)
-}
-
-// ScoreForModify reflects modifying a request (delete+recreate) -> M, R, L.
-func (c *ChainScoreCalculator) ScoreForModify(s ChainState) (float64, error) {
-	s.Event = EventModify
-	return c.Score(s)
-}
-
 // ScoreForRespond reflects a response -> recomputes P (+ is_proposed when the
 // chain closes). Pass the state with the increased ApprovedVotes.
 func (c *ChainScoreCalculator) ScoreForRespond(s ChainState) (float64, error) {
 	s.Event = EventRespond
-	return c.Score(s)
-}
-
-// ScoreForConfirm reflects a confirmation -> recomputes P (+ is_frozen when fully frozen).
-func (c *ChainScoreCalculator) ScoreForConfirm(s ChainState) (float64, error) {
-	s.Event = EventConfirm
 	return c.Score(s)
 }
 
