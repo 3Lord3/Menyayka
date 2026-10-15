@@ -137,9 +137,23 @@ make loadtest        # k6: register → item → list → login
 
 ### CI/CD and deploy
 
-On pull requests, GitHub Actions runs backend unit tests, frontend typecheck/lint/test and E2E. On push to `main`, the same checks plus mandatory E2E run before the images are built for GHCR and deployed.
+On pull requests, GitHub Actions runs backend unit tests, frontend typecheck/lint/test and E2E. On push to `main`, the same checks plus mandatory E2E run before the images are built and pushed to GHCR (`latest` and `<sha>`).
 
-Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-deploy to a VPS on push to `main` (workflow `.github/workflows/deploy.yml`): image build and push to GHCR → SSH deploy to VPS (migrate + `docker compose up`) → Caddy serves your domain (set `Caddyfile` `server_name` and `WS_ALLOWED_ORIGINS` in `.env`).
+Deploy is pull-based: GitHub never connects to the VPS and no SSH keys are stored in GitHub. The server keeps a checkout of the repo, and a systemd timer runs `deploy/pull-deploy.sh` every 5 minutes: the script updates the checkout, pulls the `backend`/`frontend` images from GHCR, applies migrations, restarts the stack and probes `https://$HEALTHCHECK_HOST/healthz`.
+
+One-time VPS setup:
+
+```bash
+sudo mkdir -p /opt/menyayka && sudo chown "$USER" /opt/menyayka
+git clone <repo-url> /opt/menyayka   # read-only deploy key, or https for a public repo
+cd /opt/menyayka
+cp .env.deploy.example .env && nano .env   # secrets, DOCKER_IMAGE_PREFIX, HEALTHCHECK_HOST
+sudo cp deploy/menyayka-deploy.{service,timer} /etc/systemd/system/
+sudo systemctl enable --now menyayka-deploy.timer
+bash deploy/pull-deploy.sh           # first deploy
+```
+
+Private GHCR packages need `GHCR_USER` and `GHCR_TOKEN` (classic PAT, `read:packages` scope) in `.env`; public ones need no login. Caddy serves your domain — set `server_name` in `Caddyfile` and `WS_ALLOWED_ORIGINS` in `.env`.
 
 ---
 
@@ -223,9 +237,12 @@ menyayka/
 │   ├── features.json            # feature manifest (shared with Go extractor)
 │   └── golden/                  # golden test rows for the Go inference
 ├── loadtest/k6/                 # load testing scenario
+├── deploy/
+│   ├── pull-deploy.sh           # pull-based deploy on the VPS (systemd timer)
+│   └── menyayka-deploy.*        # systemd units
 ├── .github/workflows/
 │   ├── ci.yml                   # mandatory PR checks
-│   └── deploy.yml               # tests → E2E → build/push → deploy
+│   └── deploy.yml               # tests → E2E → build/push to GHCR
 ├── docker-compose.yml           # local development
 ├── docker-compose.e2e.yml       # light stack for E2E/K6
 ├── docker-compose.prod.yml      # production

@@ -137,9 +137,23 @@ make loadtest        # k6: register → item → list → login
 
 ### CI/CD и деплой
 
-На pull request GitHub Actions запускает unit-тесты backend, проверки frontend и E2E. При пуше в `main` те же проверки плюс обязательный E2E проходят до сборки образов в GHCR и деплоя.
+На pull request GitHub Actions запускает unit-тесты backend, проверки frontend и E2E. При пуше в `main` те же проверки плюс обязательный E2E проходят до сборки и публикации Docker-образов в GHCR (`latest` и `<sha>`).
 
-Продакшен-стек: `docker-compose.prod.yml` + Caddy + образы из GHCR. Автодеплой на VPS при пуше в `main` (workflow `.github/workflows/deploy.yml`): сборка и публикация образов в GHCR → SSH-деплой на VPS (migrate + `docker compose up`) → Caddy отдаёт ваш домен (задайте `server_name` в `Caddyfile` и `WS_ALLOWED_ORIGINS` в `.env`).
+Деплой — pull-схема: GitHub не ходит на VPS, SSH-ключи в GitHub не хранятся. На сервере лежит checkout репозитория, а systemd-таймер раз в 5 минут запускает `deploy/pull-deploy.sh`: скрипт обновляет checkout, тянет из GHCR образы `backend`/`frontend`, применяет миграции, перезапускает стек и проверяет `https://$HEALTHCHECK_HOST/healthz`.
+
+Разовая настройка на VPS:
+
+```bash
+sudo mkdir -p /opt/menyayka && sudo chown "$USER" /opt/menyayka
+git clone <repo-url> /opt/menyayka   # read-only deploy key или https для публичного репо
+cd /opt/menyayka
+cp .env.deploy.example .env && nano .env   # секреты, DOCKER_IMAGE_PREFIX, HEALTHCHECK_HOST
+sudo cp deploy/menyayka-deploy.{service,timer} /etc/systemd/system/
+sudo systemctl enable --now menyayka-deploy.timer
+bash deploy/pull-deploy.sh           # первый деплой
+```
+
+Приватные GHCR-пакеты: укажите `GHCR_USER` и `GHCR_TOKEN` (classic PAT, scope `read:packages`) в `.env`; публичные логина не требуют. Домен отдаёт Caddy — задайте `server_name` в `Caddyfile` и `WS_ALLOWED_ORIGINS` в `.env`.
 
 ---
 
@@ -223,9 +237,12 @@ menyayka/
 │   ├── features.json            # манифест фич (общий с Go-экстрактором)
 │   └── golden/                  # golden-строки для Go-теста инференса
 ├── loadtest/k6/                 # нагрузочный сценарий
+├── deploy/
+│   ├── pull-deploy.sh           # pull-деплой на VPS (systemd timer)
+│   └── menyayka-deploy.*        # unit-файлы systemd
 ├── .github/workflows/
 │   ├── ci.yml                   # обязательные проверки на PR
-│   └── deploy.yml               # тесты → E2E → build/push → deploy
+│   └── deploy.yml               # тесты → E2E → build/push в GHCR
 ├── docker-compose.yml           # локальная разработка
 ├── docker-compose.e2e.yml       # лёгкий стек для E2E/K6
 ├── docker-compose.prod.yml      # продакшен
