@@ -2,11 +2,11 @@
 // confirmations). Two backends are supported:
 //
 //   - smtp   — RFC 5321 SMTP. Use when your VPS / network allows outbound
-//              port 25 / 465 / 587 and you have a relay (Mailgun, Brevo,
-//              Gmail, your own SMTP server, ...).
+//     port 25 / 465 / 587 and you have a relay (Mailgun, Brevo,
+//     Gmail, your own SMTP server, ...).
 //   - resend — Resend HTTP API (https://resend.com). Use when SMTP is
-//              blocked (e.g. many cloud VPS providers) and you want a
-//              hosted API instead.
+//     blocked (e.g. many cloud VPS providers) and you want a
+//     hosted API instead.
 //
 // The choice is made at startup via MAILER_PROVIDER in the environment.
 package mailer

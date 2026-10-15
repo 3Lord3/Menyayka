@@ -26,7 +26,7 @@ type Config struct {
 	// Two backends are supported via MAILER_PROVIDER: "smtp" (default) or "resend".
 	// Deliberately not required: the backend starts without it and only email sending
 	// fails (see mailer.ErrNotConfigured).
-	MailerProvider  string // "smtp" | "resend"; empty = smtp
+	MailerProvider string // "smtp" | "resend"; empty = smtp
 	// SMTP backend.
 	SMTPHost       string
 	SMTPPort       string
