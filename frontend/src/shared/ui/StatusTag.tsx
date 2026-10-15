@@ -16,7 +16,7 @@ const TONE_TOKEN: Partial<Record<StatusTone, keyof GlobalToken>> = {
   error: 'colorError',
 };
 
-export interface StatusTagProps {
+interface StatusTagProps {
   tone: StatusTone;
   children: ReactNode;
 }

@@ -9,8 +9,7 @@
 }
 
 // последнее поле блока отбивает сам блок, иначе отступы складываются
-.request-form__block > :last-child,
-.request-form__profile > :last-child {
+.request-form__block > :last-child {
   margin-bottom: 0;
 }
 
@@ -28,8 +27,7 @@
   flex-direction: column;
 }
 
-.request-form__heading,
-.request-form__subheading {
+.request-form__heading {
   margin-bottom: var(--spacing-md);
 }
 
@@ -37,13 +35,6 @@
   font-size: var(--font-size-h2);
   font-weight: var(--font-weight-semibold);
   line-height: var(--line-height-heading);
-}
-
-.request-form__subheading {
-  font-size: var(--font-size-body-sm);
-  font-weight: var(--font-weight-medium);
-  line-height: var(--line-height-heading);
-  color: var(--color-text-secondary);
 }
 
 .request-form__items {
@@ -104,11 +95,6 @@
   background: var(--color-bg-card);
   border-radius: var(--radius-md);
   font-size: var(--font-size-body);
-}
-
-.request-form__profile {
-  display: flex;
-  flex-direction: column;
 }
 
 .request-form__lock {

@@ -10,7 +10,7 @@ import {
 
 import { getErrorMessage } from '@shared/lib/errorMessage';
 
-export interface VoteTarget {
+interface VoteTarget {
   chainId: number;
   requestId: number;
   targetRequestId: number;

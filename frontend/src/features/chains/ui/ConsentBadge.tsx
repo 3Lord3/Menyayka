@@ -1,6 +1,6 @@
 import './ConsentBadge.scss';
 
-export interface ConsentBadgeProps {
+interface ConsentBadgeProps {
   count: number;
   total: number;
   className?: string;

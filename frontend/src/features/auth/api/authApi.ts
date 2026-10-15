@@ -34,7 +34,7 @@ export async function fetchMeRequest(): Promise<User> {
   return data;
 }
 
-export interface SendCodeResponse {
+interface SendCodeResponse {
   message: 'code_sent';
 }
 

@@ -4,7 +4,7 @@ import { Button } from 'antd';
 
 import './FreezeDecisionModal.scss';
 
-export interface FreezeDecisionModalProps {
+interface FreezeDecisionModalProps {
   onClose: () => void;
   onConfirm: () => Promise<void>;
   onDecline: () => void;

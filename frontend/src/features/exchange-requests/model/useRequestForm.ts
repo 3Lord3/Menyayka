@@ -18,7 +18,7 @@ import { useItems } from '@entities/item';
 import { DESCRIPTION_MIN_LENGTH } from '@shared/config/categories';
 import { getErrorMessage } from '@shared/lib/errorMessage';
 
-export interface RequestFormValues {
+interface RequestFormValues {
   offeredItemId: number;
   wantedDescription: string;
   wantedCategory?: string;

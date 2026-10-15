@@ -1,4 +1,4 @@
-export interface ParticipantAlias {
+interface ParticipantAlias {
   name: string;
   emoji: string;
 }

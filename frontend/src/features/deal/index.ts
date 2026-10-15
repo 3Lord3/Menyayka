@@ -1,5 +1,5 @@
-export { useDealFulfillment, type DealFulfillmentKind } from './model/useDealFulfillment';
-export { compressImageFile, useDealPhoto } from './model/useDealPhoto';
+export { useDealFulfillment } from './model/useDealFulfillment';
+export { useDealPhoto } from './model/useDealPhoto';
 export { usePickupPoint } from './model/usePickupPoint';
 export { PICKUP_POINTS } from './model/pickupPoints';
 export { DealDoneView } from './ui/DealDoneView';
