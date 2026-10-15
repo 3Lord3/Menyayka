@@ -1,13 +1,12 @@
-# Production stack: pull pre-built images from GHCR (see .github/workflows/deploy.yml).
-# On the server: copy this file + Caddyfile + backend/migrations + .env
-# (see .env.deploy.example), then compose pull / migrate / up.
+# Production stack: pull pre-built images from GHCR.
+# The VPS keeps a checkout of this repo and runs deploy/pull-deploy.sh on a
+# systemd timer: it pulls the images, applies migrations and brings the stack up.
 #
 # Required env: see .env.deploy.example
-# (DB_*, JWT_SECRET, S3, RESEND, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
+# (DB_*, JWT_SECRET, S3, MAILER_*, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
 #
-# image: — what CI pulls from GHCR.
-# build: — the fallback path for manual builds on the VPS (compose build);
-#          not used in auto-deploy (pull only there).
+# image: — the image CI pushes to GHCR.
+# build: — fallback for manual builds on the VPS; the pull deploy doesn't build.
 
 services:
   db:

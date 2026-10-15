@@ -1,12 +1,13 @@
-name: Deploy
+name: Release
+
+# CI only tests and pushes images to GHCR. The VPS deploys itself:
+# deploy/pull-deploy.sh runs on a systemd timer, pulls new images and
+# brings the stack up — so no SSH keys live in GitHub.
 
 on:
   push:
     branches: [main]
   workflow_dispatch:
-
-env:
-  DEPLOY_PATH: /opt/menyayka
 
 permissions:
   contents: read
@@ -123,88 +124,3 @@ jobs:
             ${{ env.IMAGE_PREFIX }}/frontend:latest
             ${{ env.IMAGE_PREFIX }}/frontend:${{ github.sha }}
 
-  deploy:
-    needs: [build-and-push]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Image prefix
-        run: |
-          echo "IMAGE_PREFIX=ghcr.io/$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_ENV"
-
-      - name: Ensure deploy directory
-        uses: appleboy/ssh-action@v1.2.5
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: mkdir -p "${{ env.DEPLOY_PATH }}/backend"
-
-      - name: Copy compose, Caddyfile, migrations
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          source: "docker-compose.prod.yml,Caddyfile,backend/migrations"
-          target: ${{ env.DEPLOY_PATH }}/
-          overwrite: true
-
-      - name: Deploy on VPS
-        uses: appleboy/ssh-action@v1.2.5
-        env:
-          IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
-          IMAGE_TAG: ${{ github.sha }}
-          DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
-          # HEALTHCHECK_HOST is the public domain Caddy serves, used for the post-deploy probe.
-          # Falls back to "example.com" only as a syntactic placeholder; the probe will
-          # fail loudly there, which is the desired behaviour if the secret is missing.
-          HEALTHCHECK_HOST: ${{ vars.HEALTHCHECK_HOST || secrets.HEALTHCHECK_HOST || 'example.com' }}
-          GHCR_USER: ${{ github.actor }}
-          GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          envs: IMAGE_PREFIX,IMAGE_TAG,DEPLOY_PATH,HEALTHCHECK_HOST,GHCR_USER,GHCR_PAT
-          script: |
-            set -euo pipefail
-            cd "$DEPLOY_PATH"
-
-            if [ ! -f .env ]; then
-              echo "ERROR: $DEPLOY_PATH/.env is missing. Copy .env.deploy.example to .env and fill secrets."
-              exit 1
-            fi
-
-            echo "$GHCR_PAT" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-
-            export DOCKER_IMAGE_PREFIX="$IMAGE_PREFIX"
-            export IMAGE_TAG="$IMAGE_TAG"
-
-            # Pin the deploy tag in .env so a manual compose up
-            # doesn't roll back to IMAGE_TAG=latest from the old file.
-            if grep -q '^IMAGE_TAG=' .env; then
-              sed -i "s/^IMAGE_TAG=.*/IMAGE_TAG=${IMAGE_TAG}/" .env
-            else
-              echo "IMAGE_TAG=${IMAGE_TAG}" >> .env
-            fi
-            if grep -q '^DOCKER_IMAGE_PREFIX=' .env; then
-              sed -i "s|^DOCKER_IMAGE_PREFIX=.*|DOCKER_IMAGE_PREFIX=${IMAGE_PREFIX}|" .env
-            else
-              echo "DOCKER_IMAGE_PREFIX=${IMAGE_PREFIX}" >> .env
-            fi
-
-            docker compose -f docker-compose.prod.yml pull
-            docker compose -f docker-compose.prod.yml up -d db
-            sleep 8
-            docker compose -f docker-compose.prod.yml run --rm migrate
-            docker compose -f docker-compose.prod.yml up -d --remove-orphans
-            docker compose -f docker-compose.prod.yml up -d --force-recreate caddy
-
-            # Check that the backend (not the frontend HTML) answers.
-            # HEALTHCHECK_HOST must be the public domain Caddy serves; defaults to
-            # "example.com" purely for syntax — the curl/grep will fail there.
-            curl -fsS --max-time 15 "https://${HEALTHCHECK_HOST}/healthz" | grep -q '"status"'
-
-            docker image prune -f

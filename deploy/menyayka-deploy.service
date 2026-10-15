@@ -1,0 +1,13 @@
+[Unit]
+Description=Menyayka pull-based deploy (pull GHCR images, migrate, restart the stack)
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+# The checkout that deploy/pull-deploy.sh updates and runs from.
+WorkingDirectory=/opt/menyayka
+ExecStart=/opt/menyayka/deploy/pull-deploy.sh
+# A slow registry is fine, but don't hang forever.
+TimeoutStartSec=15min
