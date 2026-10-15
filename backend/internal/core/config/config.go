@@ -22,16 +22,12 @@ type Config struct {
 	JWTSecret   string
 	JWTTokenTTL time.Duration
 
-	// SMTP* config for sending password-recovery emails. Deliberately not required:
-	// the rest of the backend starts without them and only email sending fails
-	// (see mailer.ErrNotConfigured).
-	SMTPHost     string
-	SMTPPort     string
-	SMTPUsername string
-	SMTPPassword string
-	SMTPFrom     string
-	// SMTPEncryption is "plain" | "starttls" | "tls", see internal/infrastructure/mailer.
-	SMTPEncryption  string
+	// Mailer config for transactional emails (password recovery, exchange confirmations).
+	// Uses the Resend HTTP service (avoids SMTP blocking on cloud VPS providers).
+	// Deliberately not required: the backend starts without it and only email sending
+	// fails (see mailer.ErrNotConfigured).
+	ResendAPIKey   string
+	MailFrom        string
 	RecoveryCodeTTL time.Duration
 
 	// Embedding* config for generating want vectors (TEI).
@@ -212,12 +208,8 @@ func Load() (*Config, error) {
 		JWTSecret:   jwtSecret,
 		JWTTokenTTL: jwtTokenTTL,
 
-		SMTPHost:        envOrDefault("SMTP_HOST", ""),
-		SMTPPort:        envOrDefault("SMTP_PORT", "587"),
-		SMTPUsername:    envOrDefault("SMTP_USERNAME", ""),
-		SMTPPassword:    envOrDefault("SMTP_PASSWORD", ""),
-		SMTPFrom:        envOrDefault("SMTP_FROM", ""),
-		SMTPEncryption:  envOrDefault("SMTP_ENCRYPTION", "starttls"),
+		ResendAPIKey:    envOrDefault("RESEND_API_KEY", ""),
+		MailFrom:        envOrDefault("MAIL_FROM", ""),
 		RecoveryCodeTTL: recoveryCodeTTL,
 
 		EmbeddingProvider: envOrDefault("EMBEDDING_PROVIDER", "stub"),

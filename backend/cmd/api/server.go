@@ -58,12 +58,8 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	userRepository := userRepo.NewRepository(pool)
 	codeStore := codestore.New()
 	mailerSvc := mailer.NewService(mailer.Config{
-		Host:       cfg.SMTPHost,
-		Port:       cfg.SMTPPort,
-		Username:   cfg.SMTPUsername,
-		Password:   cfg.SMTPPassword,
-		From:       cfg.SMTPFrom,
-		Encryption: mailer.Encryption(cfg.SMTPEncryption),
+		APIKey: cfg.ResendAPIKey,
+		From:   cfg.MailFrom,
 	})
 	userSvc := userService.NewService(userRepository, tokenService, codeStore, mailerSvc, cfg.RecoveryCodeTTL)
 	userH := userHandler.NewHandler(userSvc)
