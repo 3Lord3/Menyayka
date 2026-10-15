@@ -26,6 +26,8 @@ env_get() {
 DOCKER_IMAGE_PREFIX="$(env_get DOCKER_IMAGE_PREFIX)"
 IMAGE_TAG="$(env_get IMAGE_TAG)"
 IMAGE_TAG="${IMAGE_TAG:-latest}"
+DEPLOY_BRANCH="$(env_get DEPLOY_BRANCH)"
+DEPLOY_BRANCH="${DEPLOY_BRANCH:-main}"
 GHCR_USER="$(env_get GHCR_USER)"
 GHCR_TOKEN="$(env_get GHCR_TOKEN)"
 HEALTHCHECK_HOST="$(env_get HEALTHCHECK_HOST)"
@@ -38,8 +40,8 @@ fi
 # 1. Repo files (compose, Caddyfile, migrations) come from the checkout.
 #    The script owns them — keep local settings in .env only.
 if [ -d .git ]; then
-  git fetch --quiet origin main
-  git reset --hard --quiet origin/main
+  git fetch --quiet origin "$DEPLOY_BRANCH"
+  git reset --hard --quiet FETCH_HEAD
 fi
 
 # 2. GHCR login for private packages; skipped when the packages are public.
