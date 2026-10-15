@@ -199,6 +199,6 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --force-recreate caddy
 
             # Check that the backend (not the frontend HTML) answers
-            curl -fsS --max-time 15 https://menyayka.tech/healthz | grep -q '"status"'
+            curl -fsS --max-time 15 https://${HEALTHCHECK_HOST:-example.com}/healthz | grep -q '"status"'
 
             docker image prune -f

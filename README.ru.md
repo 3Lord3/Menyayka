@@ -82,29 +82,45 @@ docker compose up -d --build
 # или: make up
 ```
 
-Поднимается всё: PostgreSQL + pgvector, миграции, MinIO, TEI, backend и frontend.
+Поднимается всё: PostgreSQL + pgvector, миграции, SeaweedFS (S3-совместимое хранилище), TEI, backend и frontend.
 
 | Что | URL |
 |-----|-----|
 | UI (frontend) | http://localhost:3000 |
 | API (backend) | http://localhost:8080 |
-| MinIO | http://localhost:9000 |
+| SeaweedFS S3 | http://localhost:9000 |
 
-Фронт отдаёт статику и проксирует `/api` → backend, `/s3` → MinIO (same-origin, пустой `VITE_API_BASE_URL`).
+Фронт отдаёт статику и проксирует `/api` → backend, `/s3` → SeaweedFS (same-origin, пустой `VITE_API_BASE_URL`).
 
 Остановка:
 
 ```bash
-make down        # контейнеры + данные БД/MinIO; кэш TEI сохраняется
+make down        # контейнеры + данные БД/SeaweedFS; кэш TEI сохраняется
 make down-all    # полный сброс, включая кэш модели
 ```
 
 ### Разработка фронта без Docker (опционально)
 
 ```bash
-docker compose up -d db migrate minio minio-init tei app
+docker compose up -d db migrate seaweedfs tei app
 cd frontend && npm ci && npm run dev   # http://localhost:5173 → proxy на :8080
 ```
+
+### Запуск на ARM (Apple Silicon, ARM64 VPS, Raspberry Pi)
+
+Все сервисы нативно работают на `linux/arm64`, кроме embeddings — тег
+`huggingface/text-embeddings-inference:cpu-1.9` собран только под `linux/amd64`
+(нет multi-arch манифеста и нет версионизированного arm64-тега). Перед
+`make up` укажите arm-специфичный тег:
+
+```bash
+echo 'TEI_IMAGE=ghcr.io/huggingface/text-embeddings-inference:cpu-arm64-latest' >> .env
+make up
+```
+
+Остальные образы (`pgvector`, `chrislusf/seaweedfs`, `migrate/migrate`,
+`caddy:2-alpine`, `node:22-alpine`, `golang:1.26-alpine`) — multi-arch и
+выбираются Docker-ом автоматически по архитектуре хоста.
 
 ### Полезные команды
 
@@ -121,7 +137,7 @@ make loadtest        # k6: register → item → list → login
 
 На pull request GitHub Actions запускает unit-тесты backend, проверки frontend и E2E. При пуше в `main` те же проверки плюс обязательный E2E проходят до сборки образов в GHCR и деплоя.
 
-Продакшен-стек: `docker-compose.prod.yml` + Caddy + образы из GHCR. Автодеплой на VPS при пуше в `main` (workflow `.github/workflows/deploy.yml`): сборка и публикация образов в GHCR → SSH-деплой на VPS (migrate + `docker compose up`) → Caddy отдаёт `menyayka.tech`.
+Продакшен-стек: `docker-compose.prod.yml` + Caddy + образы из GHCR. Автодеплой на VPS при пуше в `main` (workflow `.github/workflows/deploy.yml`): сборка и публикация образов в GHCR → SSH-деплой на VPS (migrate + `docker compose up`) → Caddy отдаёт ваш домен (задайте `server_name` в `Caddyfile` и `WS_ALLOWED_ORIGINS` в `.env`).
 
 ---
 
@@ -137,7 +153,7 @@ make loadtest        # k6: register → item → list → login
 | Миграции | golang-migrate |
 | Auth | JWT (Bearer) |
 | Embeddings | Hugging Face TEI (`multilingual-e5-small`) / stub |
-| Объектное хранилище | MinIO (S3-совместимое) |
+| Объектное хранилище | SeaweedFS (S3-совместимое) |
 | Почта | SMTP (восстановление пароля) |
 | Тесты | `testing`, httptest; E2E с build-tag `e2e` |
 | Realtime | WebSocket (`github.com/coder/websocket`), in-memory Hub |
@@ -270,7 +286,7 @@ cd backend && swag init -g cmd/api/main.go -o docs --parseInternal
 |------------|-----------------------|------------|
 | `VITE_API_BASE_URL` | (пусто, relative `/api`) | Базовый URL API (префикс `/api/v1` добавляется автоматически). Пусто = через Vite-прокси на `:8080` |
 
-Запрос с пустым `VITE_API_BASE_URL` идёт relative через Vite-прокси (`vite.config.ts`, `server.proxy`) на `http://localhost:8080` — бэкенду не нужен CORS. Фото приходят как `imageUrl` из `MINIO_PUBLIC_ENDPOINT` и используются как есть.
+Запрос с пустым `VITE_API_BASE_URL` идёт relative через Vite-прокси (`vite.config.ts`, `server.proxy`) на `http://localhost:8080` — бэкенду не нужен CORS. Фото приходят как `imageUrl` из `S3_PUBLIC_ENDPOINT` и используются как есть.
 
 ### Feature-Sliced Design
 

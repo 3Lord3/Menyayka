@@ -146,12 +146,12 @@ func TestLoadAllowedOriginsParsing(t *testing.T) {
 		t.Fatalf("WSAllowedOrigins = %v, want nil", cfg.WSAllowedOrigins)
 	}
 
-	t.Setenv("WS_ALLOWED_ORIGINS", " http://localhost:5173 , https://menyayka.tech ")
+	t.Setenv("WS_ALLOWED_ORIGINS", " http://localhost:5173 , https://example.com ")
 	cfg, err = config.Load()
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []string{"http://localhost:5173", "https://menyayka.tech"}
+	want := []string{"http://localhost:5173", "https://example.com"}
 	if len(cfg.WSAllowedOrigins) != len(want) {
 		t.Fatalf("WSAllowedOrigins = %v, want %v", cfg.WSAllowedOrigins, want)
 	}
