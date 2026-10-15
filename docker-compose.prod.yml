@@ -3,7 +3,7 @@
 # (see .env.deploy.example), then compose pull / migrate / up.
 #
 # Required env: see .env.deploy.example
-# (DB_*, JWT_SECRET, MinIO, SMTP, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
+# (DB_*, JWT_SECRET, S3, SMTP, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
 #
 # image: — what CI pulls from GHCR.
 # build: — the fallback path for manual builds on the VPS (compose build);
@@ -46,42 +46,20 @@ services:
       - menyayka-network
     restart: "no"
 
-  minio:
-    container_name: menyayka-minio
-    # minio/minio was removed from Docker Hub; elestio/minio mirrors the official
-    # image (same entrypoint) and bundles mc, so it also serves minio-init.
-    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
-    environment:
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+  # SeaweedFS S3-compatible backend. Buckets auto-create on first request.
+  seaweedfs:
+    container_name: menyayka-seaweedfs
+    image: chrislusf/seaweedfs:latest
     volumes:
-      - minio_data:/home/shared
-    command: minio server /home/shared --console-address ":9001"
+      - seaweedfs_data:/data
+    command: server -dir=/data -s3 -s3.port=9000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 15s
+      start_period: 20s
     restart: unless-stopped
-    networks:
-      - menyayka-network
-
-  minio-init:
-    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
-    depends_on:
-      minio:
-        condition: service_healthy
-    environment:
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET:-items}
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 $${MINIO_ACCESS_KEY} $${MINIO_SECRET_KEY} &&
-      mc mb --ignore-existing local/$${MINIO_BUCKET}
-      "
-    restart: on-failure
     networks:
       - menyayka-network
 
@@ -112,8 +90,8 @@ services:
         condition: service_healthy
       tei:
         condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_healthy
     environment:
       - SERVER_PORT=8080
       - GIN_MODE=release
@@ -141,18 +119,18 @@ services:
       - CYCLE_MAX_SCORE_GAP=${CYCLE_MAX_SCORE_GAP:-1}
       - CYCLE_OUTGOING_K=${CYCLE_OUTGOING_K:-20}
       - CYCLE_MAX_DRAFTS=${CYCLE_MAX_DRAFTS:-10}
-      - MINIO_ENDPOINT=minio:9000
-      # Browser: https://menyayka.tech/s3/items/... (Caddy handle_path /s3)
-      - MINIO_PUBLIC_ENDPOINT=${MINIO_PUBLIC_ENDPOINT:-menyayka.tech/s3}
-      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
-      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
-      - MINIO_BUCKET=${MINIO_BUCKET:-items}
-      - MINIO_USE_SSL=false
-      - MINIO_PUBLIC_USE_SSL=true
+      - S3_ENDPOINT=seaweedfs:9000
+      # Browser: https://<S3_PUBLIC_ENDPOINT>/items/... (Caddy handle_path /s3)
+      - S3_PUBLIC_ENDPOINT=${S3_PUBLIC_ENDPOINT:-example.com/s3}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-items}
+      - S3_USE_SSL=false
+      - S3_PUBLIC_USE_SSL=true
       - RANKER_MODE=${RANKER_MODE:-ml}
       - RANKER_MODEL_PATH=${RANKER_MODEL_PATH:-/models/ranker_v1.txt}
       # Realtime WebSocket: fail-closed origin whitelist.
-      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS:-https://menyayka.tech}
+      - WS_ALLOWED_ORIGINS=${WS_ALLOWED_ORIGINS:-https://example.com}
       - WS_HEARTBEAT=${WS_HEARTBEAT:-30s}
       - WS_MAX_CONNS_PER_USER=${WS_MAX_CONNS_PER_USER:-5}
     restart: unless-stopped
@@ -192,7 +170,7 @@ services:
 volumes:
   pgdata:
   teidata:
-  minio_data:
+  seaweedfs_data:
   caddy_data:
   caddy_config:
 

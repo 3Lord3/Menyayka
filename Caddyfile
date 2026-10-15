@@ -1,4 +1,4 @@
-menyayka.tech, www.menyayka.tech {
+example.com, www.example.com {
 	encode gzip
 
 	# Backend liveness (don't serve the SPA from the frontend)
@@ -6,9 +6,9 @@ menyayka.tech, www.menyayka.tech {
 		reverse_proxy backend:8080
 	}
 
-	# Item photos from MinIO: https://menyayka.tech/s3/items/...
+	# Item photos from SeaweedFS S3 backend: https://example.com/s3/items/...
 	handle_path /s3/* {
-		reverse_proxy minio:9000
+		reverse_proxy seaweedfs:9000
 	}
 
 	# API same-origin for the frontend with an empty VITE_API_BASE_URL
