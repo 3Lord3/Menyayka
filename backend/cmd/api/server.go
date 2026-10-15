@@ -137,19 +137,19 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	).WithRealtimeEmitter(transactionManager)
 	exchangeOfferH := exchangeOfferHandler.NewHandler(exchangeOfferSvc)
 
-	publicUseSSL := cfg.MinIOPublicUseSSL
+	publicUseSSL := cfg.S3PublicUseSSL
 	imageStorage, err := storage.New(ctx, storage.Config{
-		Endpoint:       cfg.MinIOEndpoint,
-		PublicEndpoint: cfg.MinIOPublicEndpoint,
-		AccessKey:      cfg.MinIOAccessKey,
-		SecretKey:      cfg.MinIOSecretKey,
-		Bucket:         cfg.MinIOBucket,
-		UseSSL:         cfg.MinIOUseSSL,
+		Endpoint:       cfg.S3Endpoint,
+		PublicEndpoint: cfg.S3PublicEndpoint,
+		AccessKey:      cfg.S3AccessKey,
+		SecretKey:      cfg.S3SecretKey,
+		Bucket:         cfg.S3Bucket,
+		UseSSL:         cfg.S3UseSSL,
 		PublicUseSSL:   &publicUseSSL,
 	})
 	if err != nil {
 		cleanup()
-		return nil, nil, fmt.Errorf("minio storage init: %w", err)
+		return nil, nil, fmt.Errorf("s3 storage init: %w", err)
 	}
 
 	itemRepository := itemRepo.NewRepository(pool)

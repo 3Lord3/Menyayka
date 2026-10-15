@@ -41,19 +41,19 @@ type Config struct {
 	VectorDim         int
 	EmbeddingTimeout  time.Duration
 	MaxInputLength    int
-	// MinIO* config for item-photo object storage (see internal/infrastructure/storage).
-	// MinIOEndpoint is the S3-client address inside the Docker network (e.g. "minio:9000").
-	// MinIOPublicEndpoint is the address that lands in image_url and must be reachable
-	// from the host browser (e.g. "localhost:9000", since MinIO's port is published).
-	MinIOEndpoint       string
-	MinIOPublicEndpoint string
-	MinIOAccessKey      string
-	MinIOSecretKey      string
-	MinIOBucket         string
-	MinIOUseSSL         bool
-	// MinIOPublicUseSSL is the scheme of public image_urls (via Caddy HTTPS).
-	// Defaults to MinIOUseSSL when the env var is unset.
-	MinIOPublicUseSSL bool
+	// S3* config for item-photo object storage (see pkg/storage).
+	// S3Endpoint is the S3-client address inside the Docker network (e.g. "seaweedfs:9000").
+	// S3PublicEndpoint is the address that lands in image_url and must be reachable
+	// from the host browser (e.g. "localhost:9000", since the S3 port is published).
+	S3Endpoint       string
+	S3PublicEndpoint string
+	S3AccessKey      string
+	S3SecretKey      string
+	S3Bucket         string
+	S3UseSSL         bool
+	// S3PublicUseSSL is the scheme of public image_urls (via Caddy HTTPS).
+	// Defaults to S3UseSSL when the env var is unset.
+	S3PublicUseSSL bool
 
 	// Matching* config for vector candidate search (SCRUM-24). pgvector only yields
 	// top/threshold semantic candidates; cycle search and clusters are built on top
@@ -252,13 +252,13 @@ func Load() (*Config, error) {
 		WSMsgRateWindow:    wsMsgRateWindow,
 		WSAllowQueryTicket: envOrDefault("WS_ALLOW_QUERY_TICKET", "false") == "true",
 
-		MinIOEndpoint:       envOrDefault("MINIO_ENDPOINT", "localhost:9000"),
-		MinIOPublicEndpoint: envOrDefault("MINIO_PUBLIC_ENDPOINT", "localhost:9000"),
-		MinIOAccessKey:      envOrDefault("MINIO_ACCESS_KEY", ""),
-		MinIOSecretKey:      envOrDefault("MINIO_SECRET_KEY", ""),
-		MinIOBucket:         envOrDefault("MINIO_BUCKET", "items"),
-		MinIOUseSSL:         envOrDefault("MINIO_USE_SSL", "false") == "true",
-		MinIOPublicUseSSL:   envOrDefault("MINIO_PUBLIC_USE_SSL", envOrDefault("MINIO_USE_SSL", "false")) == "true",
+		S3Endpoint:       envOrDefault("S3_ENDPOINT", "localhost:9000"),
+		S3PublicEndpoint: envOrDefault("S3_PUBLIC_ENDPOINT", "localhost:9000"),
+		S3AccessKey:      envOrDefault("S3_ACCESS_KEY", ""),
+		S3SecretKey:      envOrDefault("S3_SECRET_KEY", ""),
+		S3Bucket:         envOrDefault("S3_BUCKET", "items"),
+		S3UseSSL:         envOrDefault("S3_USE_SSL", "false") == "true",
+		S3PublicUseSSL:   envOrDefault("S3_PUBLIC_USE_SSL", envOrDefault("S3_USE_SSL", "false")) == "true",
 	}, nil
 }
 
