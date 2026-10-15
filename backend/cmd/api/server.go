@@ -57,14 +57,25 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	tokenService := token.NewService(cfg.JWTSecret, cfg.JWTTokenTTL)
 	userRepository := userRepo.NewRepository(pool)
 	codeStore := codestore.New()
-	mailerSvc := mailer.NewService(mailer.Config{
-		Host:       cfg.SMTPHost,
-		Port:       cfg.SMTPPort,
-		Username:   cfg.SMTPUsername,
-		Password:   cfg.SMTPPassword,
-		From:       cfg.SMTPFrom,
-		Encryption: mailer.Encryption(cfg.SMTPEncryption),
+	mailerSvc, err := mailer.NewService(mailer.Config{
+		Provider: mailer.Provider(cfg.MailerProvider),
+		SMTP: mailer.SMTPConfig{
+			Host:       cfg.SMTPHost,
+			Port:       cfg.SMTPPort,
+			Username:   cfg.SMTPUsername,
+			Password:   cfg.SMTPPassword,
+			From:       cfg.SMTPFrom,
+			Encryption: cfg.SMTPEncryption,
+		},
+		Resend: mailer.ResendConfig{
+			APIKey: cfg.ResendAPIKey,
+			From:   cfg.MailFrom,
+		},
 	})
+	if err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("mailer init: %w", err)
+	}
 	userSvc := userService.NewService(userRepository, tokenService, codeStore, mailerSvc, cfg.RecoveryCodeTTL)
 	userH := userHandler.NewHandler(userSvc)
 
@@ -137,19 +148,19 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	).WithRealtimeEmitter(transactionManager)
 	exchangeOfferH := exchangeOfferHandler.NewHandler(exchangeOfferSvc)
 
-	publicUseSSL := cfg.MinIOPublicUseSSL
+	publicUseSSL := cfg.S3PublicUseSSL
 	imageStorage, err := storage.New(ctx, storage.Config{
-		Endpoint:       cfg.MinIOEndpoint,
-		PublicEndpoint: cfg.MinIOPublicEndpoint,
-		AccessKey:      cfg.MinIOAccessKey,
-		SecretKey:      cfg.MinIOSecretKey,
-		Bucket:         cfg.MinIOBucket,
-		UseSSL:         cfg.MinIOUseSSL,
+		Endpoint:       cfg.S3Endpoint,
+		PublicEndpoint: cfg.S3PublicEndpoint,
+		AccessKey:      cfg.S3AccessKey,
+		SecretKey:      cfg.S3SecretKey,
+		Bucket:         cfg.S3Bucket,
+		UseSSL:         cfg.S3UseSSL,
 		PublicUseSSL:   &publicUseSSL,
 	})
 	if err != nil {
 		cleanup()
-		return nil, nil, fmt.Errorf("minio storage init: %w", err)
+		return nil, nil, fmt.Errorf("s3 storage init: %w", err)
 	}
 
 	itemRepository := itemRepo.NewRepository(pool)

@@ -6,7 +6,7 @@ PROJECT_NAME := $(shell $(COMPOSE) config --format json 2>/dev/null | grep -o '"
 
 .PHONY: up down down-all logs db-logs run test test-e2e e2e-up e2e-down loadtest swagger
 
-# Bring up the whole project with one command: DB + migrate + MinIO + TEI + backend + frontend
+# Bring up the whole project with one command: DB + migrate + SeaweedFS + TEI + backend + frontend
 up:
 	$(COMPOSE) up -d --build
 	@echo ""
@@ -14,7 +14,7 @@ up:
 	@echo "  UI:      http://localhost:$${FRONTEND_PORT:-3000}"
 	@echo "  API:     http://localhost:$${SERVER_PORT:-8080}"
 	@echo "  Swagger: http://localhost:$${SERVER_PORT:-8080}/swagger/index.html"
-	@echo "  MinIO:   http://localhost:$${MINIO_PORT:-9000}"
+	@echo "  S3 (SeaweedFS): http://localhost:$${S3_PORT:-9000}"
 	@echo ""
 
 # Stop and remove all containers and volumes EXCEPT the TEI model cache (teidata) —
@@ -22,7 +22,7 @@ up:
 # `make down`/`make up` to avoid re-downloading it.
 down:
 	$(COMPOSE) down
-	@for v in pgdata minio_data; do \
+	@for v in pgdata seaweedfs_data; do \
 		ids=$$(docker volume ls -q --filter "label=com.docker.compose.project=$(PROJECT_NAME)" --filter "label=com.docker.compose.volume=$$v"); \
 		if [ -n "$$ids" ]; then docker volume rm $$ids; fi; \
 	done

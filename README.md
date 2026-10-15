@@ -4,6 +4,8 @@
 
 A web service for multi-party barter: a user lists an item and describes what they want in return; the system finds circular exchange chains among several participants (2–5 people), suggests options, collects responses and completes the deal through soft and hard locking of offers.
 
+Demo: https://menyayka.lorot.dev
+
 ---
 
 ## Table of contents
@@ -82,29 +84,45 @@ docker compose up -d --build
 # or: make up
 ```
 
-This brings up everything: PostgreSQL + pgvector, migrations, MinIO, TEI, backend and frontend.
+This brings up everything: PostgreSQL + pgvector, migrations, SeaweedFS (S3-compatible object storage), TEI, backend and frontend.
 
 | What | URL |
 |------|-----|
 | UI (frontend) | http://localhost:3000 |
 | API (backend) | http://localhost:8080 |
-| MinIO | http://localhost:9000 |
+| SeaweedFS S3 | http://localhost:9000 |
 
-The frontend serves static files and proxies `/api` → backend, `/s3` → MinIO (same-origin, empty `VITE_API_BASE_URL`).
+The frontend serves static files and proxies `/api` → backend, `/s3` → SeaweedFS (same-origin, empty `VITE_API_BASE_URL`).
 
 Stop:
 
 ```bash
-make down        # containers + DB/MinIO data; TEI cache is kept
+make down        # containers + DB/SeaweedFS data; TEI cache is kept
 make down-all    # full reset, including the model cache
 ```
 
 ### Frontend development without Docker (optional)
 
 ```bash
-docker compose up -d db migrate minio minio-init tei app
+docker compose up -d db migrate seaweedfs tei app
 cd frontend && npm ci && npm run dev   # http://localhost:5173 → proxy to :8080
 ```
+
+### Running on ARM (Apple Silicon, ARM64 VPS, Raspberry Pi)
+
+Everything runs natively on `linux/arm64` except the embeddings service, whose
+`huggingface/text-embeddings-inference:cpu-1.9` tag only ships `linux/amd64`
+(no multi-arch manifest, no versioned `arm64` tag). Set the arm-specific tag
+before bringing the stack up:
+
+```bash
+echo 'TEI_IMAGE=ghcr.io/huggingface/text-embeddings-inference:cpu-arm64-latest' >> .env
+make up
+```
+
+All other images (`pgvector`, `chrislusf/seaweedfs`, `migrate/migrate`,
+`caddy:2-alpine`, `node:22-alpine`, `golang:1.26-alpine`) ship multi-arch and
+are selected automatically by Docker.
 
 ### Useful commands
 
@@ -121,7 +139,7 @@ make loadtest        # k6: register → item → list → login
 
 On pull requests, GitHub Actions runs backend unit tests, frontend typecheck/lint/test and E2E. On push to `main`, the same checks plus mandatory E2E run before the images are built for GHCR and deployed.
 
-Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-deploy to a VPS on push to `main` (workflow `.github/workflows/deploy.yml`): image build and push to GHCR → SSH deploy to VPS (migrate + `docker compose up`) → Caddy serves `menyayka.tech`.
+Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-deploy to a VPS on push to `main` (workflow `.github/workflows/deploy.yml`): image build and push to GHCR → SSH deploy to VPS (migrate + `docker compose up`) → Caddy serves your domain (set `Caddyfile` `server_name` and `WS_ALLOWED_ORIGINS` in `.env`).
 
 ---
 
@@ -137,7 +155,7 @@ Production stack: `docker-compose.prod.yml` + Caddy + images from GHCR. Auto-dep
 | Migrations | golang-migrate |
 | Auth | JWT (Bearer) |
 | Embeddings | Hugging Face TEI (`multilingual-e5-small`) / stub |
-| Object storage | MinIO (S3-compatible) |
+| Object storage | SeaweedFS (S3-compatible) |
 | Email | SMTP (password recovery) |
 | Tests | `testing`, httptest; E2E with build tag `e2e` |
 | Realtime | WebSocket (`github.com/coder/websocket`), in-memory hub |
@@ -271,7 +289,7 @@ runs as a **single replica**. Horizontal scaling requires either sticky sessions
 |----------|---------|---------|
 | `VITE_API_BASE_URL` | (empty, relative `/api`) | Base API URL (the `/api/v1` prefix is added automatically). Empty = through the Vite proxy to `:8080` |
 
-A request with an empty `VITE_API_BASE_URL` goes relative through the Vite proxy (`vite.config.ts`, `server.proxy`) to `http://localhost:8080`, so the backend needs no CORS. Photos arrive as `imageUrl` from `MINIO_PUBLIC_ENDPOINT` and are used as-is.
+A request with an empty `VITE_API_BASE_URL` goes relative through the Vite proxy (`vite.config.ts`, `server.proxy`) to `http://localhost:8080`, so the backend needs no CORS. Photos arrive as `imageUrl` from `S3_PUBLIC_ENDPOINT` and are used as-is.
 
 ### Feature-Sliced Design
 

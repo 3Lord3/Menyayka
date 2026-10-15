@@ -24,7 +24,7 @@ type Item struct {
 	// Category is the textual category name (e.g. "Phones").
 	Category  string
 	Embedding []float32
-	// ImageURL is the public object-storage (MinIO) photo URL; nil while no photo is uploaded.
+	// ImageURL is the public object-storage (S3/SeaweedFS) photo URL; nil while no photo is uploaded.
 	ImageURL  *string
 	Status    ItemStatus
 	CreatedAt time.Time

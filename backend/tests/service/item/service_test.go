@@ -321,5 +321,5 @@ func (f *fakeStorage) Upload(_ context.Context, objectName string, _ io.Reader, 
 	if f.uploadErr != nil {
 		return "", f.uploadErr
 	}
-	return "http://minio.local/items/" + objectName, nil
+	return "http://seaweedfs.local/items/" + objectName, nil
 }

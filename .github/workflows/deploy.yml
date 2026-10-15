@@ -157,13 +157,17 @@ jobs:
           IMAGE_PREFIX: ${{ env.IMAGE_PREFIX }}
           IMAGE_TAG: ${{ github.sha }}
           DEPLOY_PATH: ${{ env.DEPLOY_PATH }}
+          # HEALTHCHECK_HOST is the public domain Caddy serves, used for the post-deploy probe.
+          # Falls back to "example.com" only as a syntactic placeholder; the probe will
+          # fail loudly there, which is the desired behaviour if the secret is missing.
+          HEALTHCHECK_HOST: ${{ vars.HEALTHCHECK_HOST || secrets.HEALTHCHECK_HOST || 'example.com' }}
           GHCR_USER: ${{ github.actor }}
           GHCR_PAT: ${{ secrets.GITHUB_TOKEN }}
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
-          envs: IMAGE_PREFIX,IMAGE_TAG,DEPLOY_PATH,GHCR_USER,GHCR_PAT
+          envs: IMAGE_PREFIX,IMAGE_TAG,DEPLOY_PATH,HEALTHCHECK_HOST,GHCR_USER,GHCR_PAT
           script: |
             set -euo pipefail
             cd "$DEPLOY_PATH"
@@ -198,7 +202,9 @@ jobs:
             docker compose -f docker-compose.prod.yml up -d --remove-orphans
             docker compose -f docker-compose.prod.yml up -d --force-recreate caddy
 
-            # Check that the backend (not the frontend HTML) answers
-            curl -fsS --max-time 15 https://menyayka.tech/healthz | grep -q '"status"'
+            # Check that the backend (not the frontend HTML) answers.
+            # HEALTHCHECK_HOST must be the public domain Caddy serves; defaults to
+            # "example.com" purely for syntax — the curl/grep will fail there.
+            curl -fsS --max-time 15 "https://${HEALTHCHECK_HOST}/healthz" | grep -q '"status"'
 
             docker image prune -f

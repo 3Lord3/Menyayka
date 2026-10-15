@@ -1,4 +1,13 @@
-menyayka.tech, www.menyayka.tech {
+# Catch-all site block. Domain-based routing and TLS termination are done by
+# the fronting reverse proxy (the host nginx / Caddy / load balancer), so this
+# in-cluster Caddy only serves plain HTTP for whatever Host header reaches it.
+# The exposed port comes from CADDY_HTTP_PORT in compose (default 80; override
+# when the host already binds it).
+{
+	auto_https off
+}
+
+http:// {
 	encode gzip
 
 	# Backend liveness (don't serve the SPA from the frontend)
@@ -6,9 +15,9 @@ menyayka.tech, www.menyayka.tech {
 		reverse_proxy backend:8080
 	}
 
-	# Item photos from MinIO: https://menyayka.tech/s3/items/...
+	# Item photos from the SeaweedFS S3 backend.
 	handle_path /s3/* {
-		reverse_proxy minio:9000
+		reverse_proxy seaweedfs:9000
 	}
 
 	# API same-origin for the frontend with an empty VITE_API_BASE_URL

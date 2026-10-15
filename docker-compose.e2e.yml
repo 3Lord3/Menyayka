@@ -10,8 +10,6 @@ services:
       POSTGRES_USER: menyayka
       POSTGRES_PASSWORD: menyayka
       POSTGRES_DB: menyayka
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U menyayka -d menyayka"]
       interval: 5s
@@ -31,33 +29,17 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  minio:
-    # minio/minio was removed from Docker Hub; elestio/minio mirrors the official
-    # image (same entrypoint) and bundles mc, so it also serves minio-init.
-    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
-    container_name: menyayka-e2e-minio
-    environment:
-      MINIO_ACCESS_KEY: menyayka_minio
-      MINIO_SECRET_KEY: menyayka_minio_secret
-    command: minio server /home/shared --console-address ":9001"
+  # SeaweedFS S3-compatible backend. Buckets auto-create on first request.
+  seaweedfs:
+    image: chrislusf/seaweedfs:latest
+    container_name: menyayka-e2e-seaweedfs
+    command: server -dir=/data -s3 -s3.port=9000
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9000/ || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
-      start_period: 10s
-
-  minio-init:
-    image: elestio/minio@sha256:25348a257f1ece1b192f25f6cd9854618fa86422ac87b494b5d4e629c556d4bd
-    depends_on:
-      minio:
-        condition: service_healthy
-    entrypoint: >
-      /bin/sh -c "
-      mc alias set local http://minio:9000 menyayka_minio menyayka_minio_secret &&
-      mc mb --ignore-existing local/items
-      "
-    restart: on-failure
+      start_period: 15s
 
   app:
     build: ./backend
@@ -81,15 +63,15 @@ services:
       CLUSTER_DIRECTION_MARGIN: "0.05"
       CYCLE_OUTGOING_K: "20"
       CYCLE_MAX_DRAFTS: "10"
-      MINIO_ENDPOINT: minio:9000
-      MINIO_PUBLIC_ENDPOINT: localhost:9000
-      MINIO_ACCESS_KEY: menyayka_minio
-      MINIO_SECRET_KEY: menyayka_minio_secret
-      MINIO_BUCKET: items
-      MINIO_USE_SSL: "false"
+      S3_ENDPOINT: seaweedfs:9000
+      S3_PUBLIC_ENDPOINT: localhost:9000
+      S3_ACCESS_KEY: menyayka_minio
+      S3_SECRET_KEY: menyayka_minio_secret
+      S3_BUCKET: items
+      S3_USE_SSL: "false"
     depends_on:
       migrate:
         condition: service_completed_successfully
-      minio-init:
-        condition: service_completed_successfully
+      seaweedfs:
+        condition: service_healthy
     restart: on-failure
