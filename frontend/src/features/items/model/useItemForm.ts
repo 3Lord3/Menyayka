@@ -18,7 +18,7 @@ import { getErrorMessage } from '@shared/lib/errorMessage';
 
 type UploadedFile = Parameters<NonNullable<UploadProps['beforeUpload']>>[0];
 
-interface ItemFormValues {
+export interface ItemFormValues {
   title: string;
   description: string;
   category?: string;

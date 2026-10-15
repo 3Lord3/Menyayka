@@ -115,6 +115,17 @@ export default defineESLintConfig([
       ],
     },
   },
+  {
+    files: ['mock/**/*.js'],
+    languageOptions: {
+      // The mock server has its own globals
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+      },
+    },
+  },
   // Disables formatting rules that duplicate Prettier, to avoid conflicts
   prettier,
 ]);

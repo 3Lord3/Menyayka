@@ -231,6 +231,17 @@ func (h *Hub) ActiveConnections() int {
 	return h.conns
 }
 
+// ChainSubscriptions reports the total number of chain subscriptions.
+func (h *Hub) ChainSubscriptions() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	total := 0
+	for c := range h.clients {
+		total += len(c.subs)
+	}
+	return total
+}
+
 // Close closes every connection with StatusGoingAway. Concurrent calls are safe.
 func (h *Hub) Close() {
 	h.closeOnce.Do(func() {

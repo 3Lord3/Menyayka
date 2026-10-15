@@ -28,14 +28,17 @@ type StateEvent string
 
 const (
 	EventAdd         StateEvent = "ADD"         // request created/added
+	EventDelete      StateEvent = "DELETE"      // request deleted
+	EventModify      StateEvent = "MODIFY"      // request changed (= delete + add)
 	EventRespond     StateEvent = "RESPOND"     // response (a vote appears)
 	EventConfirm     StateEvent = "CONFIRM"     // confirmation
 	EventDecline     StateEvent = "DECLINE"     // decline
 	EventReplacement StateEvent = "REPLACEMENT" // quick participant replacement
 )
 
-// ChainState is a detached chain snapshot + the action that happened. Ranker
-// recomputes the score fully from this state (no +=/-=).
+// ChainState is a detached chain snapshot + the action that happened + the previous
+// score. Ranker recomputes the score fully from this state (no +=/-=): the previous
+// score is just an input like length/stage/event, not an accumulated value.
 type ChainState struct {
 	Count int // chain participant count (Length)
 
@@ -58,6 +61,9 @@ type ChainState struct {
 
 	// ApprovedVotes is the count of "approved" votes among participants, [0, Count].
 	ApprovedVotes int
+
+	// PrevScore is the previous score (an input to rules/normalization, not a term).
+	PrevScore float64
 
 	// Fields below feed the ML head (16 features). FormulaRanker ignores them:
 	// weights and the ExtractFeatures subset stay unchanged.

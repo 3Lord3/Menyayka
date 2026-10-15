@@ -9,7 +9,7 @@ import { loginRequest } from '../api/authApi';
 
 import { useApplySession } from './useApplySession';
 
-interface LoginValues {
+export interface LoginValues {
   email: string;
   password: string;
 }

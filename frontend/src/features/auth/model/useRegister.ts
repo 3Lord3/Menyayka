@@ -9,7 +9,7 @@ import { registerRequest } from '../api/authApi';
 
 import { useApplySession } from './useApplySession';
 
-interface RegisterValues {
+export interface RegisterValues {
   name: string;
   email: string;
   password: string;

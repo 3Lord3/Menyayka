@@ -61,9 +61,9 @@ func TestLoadRejectsInvalidNumericEnv(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("JWT_SECRET", "secret")
 	t.Setenv("RANKER_MODE", "")
-	t.Setenv("CLUSTER_TOPK", "not-a-number")
+	t.Setenv("MATCHING_TOPK", "not-a-number")
 	if _, err := config.Load(); err == nil {
-		t.Fatal("Load() expected error for invalid CLUSTER_TOPK")
+		t.Fatal("Load() expected error for invalid MATCHING_TOPK")
 	}
 }
 
@@ -71,6 +71,7 @@ func TestLoadRejectsInvalidDurationEnv(t *testing.T) {
 	t.Setenv("DATABASE_URL", "postgres://x")
 	t.Setenv("JWT_SECRET", "secret")
 	t.Setenv("RANKER_MODE", "")
+	t.Setenv("MATCHING_TOPK", "")
 	t.Setenv("EMBEDDING_TIMEOUT", "fast")
 	if _, err := config.Load(); err == nil {
 		t.Fatal("Load() expected error for invalid EMBEDDING_TIMEOUT")

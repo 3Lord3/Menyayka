@@ -1,5 +1,57 @@
 package search
 
+const constQueryOutgoingThreshold = `
+	SELECT er.id AS request_id, i.id AS item_id, er.user_id AS owner_id,
+	       1 - (i.embedding <=> $1) AS score
+	FROM items i
+	JOIN exchange_offers er ON er.offered_item_id = i.id
+	WHERE i.status = 'ACTIVE'
+	  AND er.status = 'ACTIVE'
+	  AND er.user_id <> $2
+	  AND i.embedding IS NOT NULL
+	  AND 1 - (i.embedding <=> $1) >= $3
+	ORDER BY i.embedding <=> $1
+`
+
+const constQueryOutgoingTopK = `
+	SELECT er.id AS request_id, i.id AS item_id, er.user_id AS owner_id,
+	       1 - (i.embedding <=> $1) AS score
+	FROM items i
+	JOIN exchange_offers er ON er.offered_item_id = i.id
+	WHERE i.status = 'ACTIVE'
+	  AND er.status = 'ACTIVE'
+	  AND er.user_id <> $2
+	  AND i.embedding IS NOT NULL
+	ORDER BY i.embedding <=> $1
+	LIMIT $3
+`
+
+const constQueryIncomingThreshold = `
+	SELECT er.id AS request_id, er.offered_item_id AS item_id, er.user_id AS owner_id,
+	       1 - (er.want_embedding <=> $1) AS score
+	FROM exchange_offers er
+	JOIN items oi ON oi.id = er.offered_item_id
+	WHERE er.status = 'ACTIVE'
+	  AND er.want_embedding IS NOT NULL
+	  AND er.user_id <> $2
+	  AND oi.status = 'ACTIVE'
+	  AND 1 - (er.want_embedding <=> $1) >= $3
+	ORDER BY er.want_embedding <=> $1
+`
+
+const constQueryIncomingTopK = `
+	SELECT er.id AS request_id, er.offered_item_id AS item_id, er.user_id AS owner_id,
+	       1 - (er.want_embedding <=> $1) AS score
+	FROM exchange_offers er
+	JOIN items oi ON oi.id = er.offered_item_id
+	WHERE er.status = 'ACTIVE'
+	  AND er.want_embedding IS NOT NULL
+	  AND er.user_id <> $2
+	  AND oi.status = 'ACTIVE'
+	ORDER BY er.want_embedding <=> $1
+	LIMIT $3
+`
+
 const querySimilarOffers = `
 	WITH nearest_by_offer AS MATERIALIZED (
 		SELECT eo.id AS request_id,

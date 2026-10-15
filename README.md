@@ -244,7 +244,7 @@ The layered architecture, error handling, the guide to adding routes, migrations
 
 Vectors are produced by [Text Embeddings Inference](https://github.com/huggingface/text-embeddings-inference) with `intfloat/multilingual-e5-small`. In docker-compose it runs as the `tei` service at `http://tei:80` (`TEI_URL`), exposed on `TEI_EXTERNAL_PORT` (default `8090`).
 
-The provider is selected by `EMBEDDING_PROVIDER`: `tei` (real service) or `stub` (default — a deterministic stub client for development without TEI). Other settings: `EMBEDDING_TIMEOUT`, `MAX_INPUT_LENGTH` (input is truncated to this many characters before the model call).
+The provider is selected by `EMBEDDING_PROVIDER`: `tei` (real service) or `stub` (default — a deterministic stub client for development without TEI). Other settings: `VECTOR_DIM`, `EMBEDDING_TIMEOUT`, `MAX_INPUT_LENGTH` (input is truncated to this many characters before the model call).
 
 Check TEI health manually:
 

@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { jsonStorage } from '@shared/lib/storage';
 
-function disputeKey(chainId: number): string {
+export function disputeKey(chainId: number): string {
   return `deal:dispute:${chainId}`;
 }
 

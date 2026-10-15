@@ -1,6 +1,6 @@
 import type { StatusTone } from '@shared/ui';
 
-type ItemStatus = 'ACTIVE' | 'UNAVAILABLE' | 'ARCHIVED';
+export type ItemStatus = 'ACTIVE' | 'UNAVAILABLE' | 'ARCHIVED';
 
 export interface Item {
   id: number;
@@ -31,7 +31,7 @@ export interface ItemsList {
 export const ITEM_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
 
 // max item-photo size — matches the backend limit (5 MiB)
-const ITEM_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
+export const ITEM_IMAGE_MAX_SIZE_BYTES = 5 * 1024 * 1024;
 
 // accept filters only the picker dialog: a file can be dropped and then a 422
 // arrives after a successful item save

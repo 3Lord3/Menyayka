@@ -76,7 +76,7 @@ export function useExchangeOptions(offerId?: number) {
 
 // key deliberately nested under ['chains']: the replacement pool is volatile and must be re-read
 // on any chain mutation, and invalidation goes by prefix
-function replacementQueryOptions(
+export function replacementQueryOptions(
   chainId?: number,
   options: { enabled?: boolean; refetchInterval?: number | false } = {},
 ) {

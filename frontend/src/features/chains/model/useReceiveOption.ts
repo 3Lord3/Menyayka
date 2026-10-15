@@ -2,7 +2,7 @@ import { useSearchParams } from 'react-router';
 
 // chain screens are one per chainId, but there are several variant cards for it: without
 // binding to requestId the screen would expand the link back into the whole cluster of requests
-const RECEIVE_OPTION_PARAM = 'option';
+export const RECEIVE_OPTION_PARAM = 'option';
 
 export function useReceiveOption(): number | undefined {
   const [searchParams] = useSearchParams();

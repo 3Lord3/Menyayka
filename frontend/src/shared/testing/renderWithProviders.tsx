@@ -11,7 +11,7 @@ export function createTestQueryClient() {
   });
 }
 
-interface RenderWithProvidersOptions {
+export interface RenderWithProvidersOptions {
   initialEntries?: string[];
   routes?: { path: string; element: ReactNode }[];
   // its own client is needed by tests that watch cache invalidation

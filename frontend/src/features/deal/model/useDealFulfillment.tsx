@@ -12,7 +12,7 @@ import {
 
 import { getErrorMessage } from '@shared/lib/errorMessage';
 
-type DealFulfillmentKind = 'handoff' | 'receipt';
+export type DealFulfillmentKind = 'handoff' | 'receipt';
 
 // The shipping/receiving endpoint error codes differ only by 409
 const HANDOFF_ERROR_MESSAGES: Record<number, string> = {

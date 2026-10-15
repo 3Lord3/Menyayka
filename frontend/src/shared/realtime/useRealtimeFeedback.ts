@@ -6,7 +6,7 @@ import { useRealtimeStatus } from './useRealtime';
 // How long the recovery notice stays on screen after the socket is back.
 const RESTORED_MS = 3_000;
 
-interface RealtimeFeedback {
+export interface RealtimeFeedback {
   status: RealtimeStatus;
   /** True for a few seconds right after a reconnect succeeded. */
   restored: boolean;

@@ -2,7 +2,7 @@ import type { ReplacementOption } from '@entities/chain';
 
 const KEY_PREFIX = 'menyayka_replacement_invited';
 
-interface InvitedRecord {
+export interface InvitedRecord {
   // null — a previous-version record that stored only the fact of the invitation
   requestId: number | null;
   option: ReplacementOption | null;

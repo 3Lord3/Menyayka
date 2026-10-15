@@ -6,7 +6,7 @@ import { removeRequest } from '@entities/exchangeRequest';
 
 import { getErrorMessage } from '@shared/lib/errorMessage';
 
-interface RemoveRequestInput {
+export interface RemoveRequestInput {
   requestId: number;
   version: number;
 }
