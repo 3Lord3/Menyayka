@@ -1,93 +1,76 @@
-// Package mailer sends transactional emails via the Resend HTTP API
-// (https://resend.com). Using a hosted API instead of SMTP works around
-// ISPs / VPS providers that block outbound port 25 / 465 / 587.
+// Package mailer sends transactional emails (password recovery, exchange
+// confirmations). Two backends are supported:
+//
+//   - smtp   — RFC 5321 SMTP. Use when your VPS / network allows outbound
+//              port 25 / 465 / 587 and you have a relay (Mailgun, Brevo,
+//              Gmail, your own SMTP server, ...).
+//   - resend — Resend HTTP API (https://resend.com). Use when SMTP is
+//              blocked (e.g. many cloud VPS providers) and you want a
+//              hosted API instead.
+//
+// The choice is made at startup via MAILER_PROVIDER in the environment.
 package mailer
 
 import (
-	"context"
 	"errors"
 	"fmt"
-	"net/mail"
-	"time"
-
-	"github.com/resend/resend-go/v4"
 )
 
-// ErrNotConfigured is returned when RESEND_API_KEY is unset.
+// Provider selects which backend NewService builds.
+type Provider string
+
+const (
+	ProviderSMTP   Provider = "smtp"
+	ProviderResend Provider = "resend"
+)
+
+// Service is the contract used by the application code.
+type Service interface {
+	SendRecoveryCode(to, code string) error
+	SendChainFrozen(to string, chainID int64, gives, receives string) error
+	SendReplacementInvitation(to string, chainID int64, gives, receives string) error
+}
+
+// ErrNotConfigured is returned when the chosen provider has its required
+// configuration missing (e.g. empty host for SMTP, empty API key for Resend).
 var ErrNotConfigured = errors.New("mailer is not configured")
 
-type Config struct {
-	// APIKey is the Resend API key (re_...).
+// SMTPConfig is used when Provider == "smtp".
+type SMTPConfig struct {
+	Host       string
+	Port       string
+	Username   string
+	Password   string
+	From       string
+	Encryption string // plain | starttls | tls; empty = starttls
+}
+
+// ResendConfig is used when Provider == "resend".
+type ResendConfig struct {
 	APIKey string
-	// From is the sender address. Must be a domain you've verified in
-	// the Resend dashboard (e.g. "Menyayka <noreply@menyayka.lorot.dev>").
-	From string
+	From   string
 }
 
-type Service struct {
-	cfg    Config
-	client *resend.Client
+// Config bundles everything the factory needs.
+type Config struct {
+	Provider Provider
+	SMTP     SMTPConfig
+	Resend   ResendConfig
 }
 
-func NewService(cfg Config) *Service {
-	var c *resend.Client
-	if cfg.APIKey != "" {
-		c = resend.NewClient(cfg.APIKey)
+// NewService returns a Service backed by the configured provider.
+//
+// Returns an error only for an unknown provider — an empty / missing
+// configuration is not fatal: the service starts and SendXxx return
+// ErrNotConfigured at first use. This matches the historical behaviour
+// (the backend used to start with no mailer configured).
+func NewService(cfg Config) (Service, error) {
+	switch cfg.Provider {
+	case ProviderSMTP, "":
+		return newSMTPService(smtpConfigFromBundle(cfg.SMTP)), nil
+	case ProviderResend:
+		return newResendService(cfg.Resend), nil
+	default:
+		return nil, fmt.Errorf("unsupported mailer provider %q", cfg.Provider)
 	}
-	return &Service{cfg: cfg, client: c}
-}
-
-// SendRecoveryCode sends a one-time password-recovery code.
-func (c *Service) SendRecoveryCode(to, code string) error {
-	const subject = "Код для восстановления пароля"
-	body := fmt.Sprintf(
-		"Здравствуйте!\r\n\r\nВаш код для восстановления пароля: %s\r\nКод действителен 10 минут.\r\n\r\nЕсли вы не запрашивали восстановление пароля — проигнорируйте это письмо.",
-		code,
-	)
-	return c.send(to, subject, body)
-}
-
-// SendChainFrozen informs a participant that every member confirmed the exchange.
-func (c *Service) SendChainFrozen(to string, chainID int64, gives, receives string) error {
-	return c.send(
-		to,
-		"Обмен подтверждён всеми участниками",
-		fmt.Sprintf("Цепочка обмена №%d собрана и заморожена.\r\n\r\nВы отдаёте: %s\r\nВы получаете: %s\r\n\r\nВсе участники подтвердили участие, товары зарезервированы для этой сделки.", chainID, gives, receives),
-	)
-}
-
-// SendReplacementInvitation asks a candidate to explicitly accept a fast replacement.
-func (c *Service) SendReplacementInvitation(to string, chainID int64, gives, receives string) error {
-	return c.send(
-		to,
-		"Приглашение в обмен",
-		fmt.Sprintf("Вас пригласили заменить участника в цепочке обмена №%d.\r\n\r\nВы отдаёте: %s\r\nВы получаете: %s\r\n\r\nОткройте предложение в приложении и самостоятельно подтвердите участие или откажитесь.", chainID, gives, receives),
-	)
-}
-
-func (c *Service) send(to, subject, body string) error {
-	if _, err := mail.ParseAddress(to); err != nil {
-		return fmt.Errorf("invalid recipient address %q: %w", to, err)
-	}
-
-	if c.cfg.APIKey == "" || c.client == nil {
-		return ErrNotConfigured
-	}
-	if c.cfg.From == "" {
-		return fmt.Errorf("mailer config: From is empty")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-
-	_, err := c.client.Emails.SendWithContext(ctx, &resend.SendEmailRequest{
-		From:    c.cfg.From,
-		To:      []string{to},
-		Subject: subject,
-		Text:    body,
-	})
-	if err != nil {
-		return fmt.Errorf("resend send: %w", err)
-	}
-	return nil
 }

@@ -23,10 +23,19 @@ type Config struct {
 	JWTTokenTTL time.Duration
 
 	// Mailer config for transactional emails (password recovery, exchange confirmations).
-	// Uses the Resend HTTP service (avoids SMTP blocking on cloud VPS providers).
+	// Two backends are supported via MAILER_PROVIDER: "smtp" (default) or "resend".
 	// Deliberately not required: the backend starts without it and only email sending
 	// fails (see mailer.ErrNotConfigured).
-	ResendAPIKey   string
+	MailerProvider  string // "smtp" | "resend"; empty = smtp
+	// SMTP backend.
+	SMTPHost       string
+	SMTPPort       string
+	SMTPUsername   string
+	SMTPPassword   string
+	SMTPFrom       string
+	SMTPEncryption string // plain | starttls | tls; empty = starttls
+	// Resend HTTP backend.
+	ResendAPIKey    string
 	MailFrom        string
 	RecoveryCodeTTL time.Duration
 
@@ -208,6 +217,13 @@ func Load() (*Config, error) {
 		JWTSecret:   jwtSecret,
 		JWTTokenTTL: jwtTokenTTL,
 
+		MailerProvider:  envOrDefault("MAILER_PROVIDER", "smtp"),
+		SMTPHost:        envOrDefault("SMTP_HOST", ""),
+		SMTPPort:        envOrDefault("SMTP_PORT", "587"),
+		SMTPUsername:    envOrDefault("SMTP_USERNAME", ""),
+		SMTPPassword:    envOrDefault("SMTP_PASSWORD", ""),
+		SMTPFrom:        envOrDefault("SMTP_FROM", ""),
+		SMTPEncryption:  envOrDefault("SMTP_ENCRYPTION", "starttls"),
 		ResendAPIKey:    envOrDefault("RESEND_API_KEY", ""),
 		MailFrom:        envOrDefault("MAIL_FROM", ""),
 		RecoveryCodeTTL: recoveryCodeTTL,

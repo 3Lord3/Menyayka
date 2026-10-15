@@ -57,10 +57,25 @@ func buildServer(ctx context.Context, cfg *config.Config, logger *logrus.Logger)
 	tokenService := token.NewService(cfg.JWTSecret, cfg.JWTTokenTTL)
 	userRepository := userRepo.NewRepository(pool)
 	codeStore := codestore.New()
-	mailerSvc := mailer.NewService(mailer.Config{
-		APIKey: cfg.ResendAPIKey,
-		From:   cfg.MailFrom,
+	mailerSvc, err := mailer.NewService(mailer.Config{
+		Provider: mailer.Provider(cfg.MailerProvider),
+		SMTP: mailer.SMTPConfig{
+			Host:       cfg.SMTPHost,
+			Port:       cfg.SMTPPort,
+			Username:   cfg.SMTPUsername,
+			Password:   cfg.SMTPPassword,
+			From:       cfg.SMTPFrom,
+			Encryption: cfg.SMTPEncryption,
+		},
+		Resend: mailer.ResendConfig{
+			APIKey: cfg.ResendAPIKey,
+			From:   cfg.MailFrom,
+		},
 	})
+	if err != nil {
+		cleanup()
+		return nil, nil, fmt.Errorf("mailer init: %w", err)
+	}
 	userSvc := userService.NewService(userRepository, tokenService, codeStore, mailerSvc, cfg.RecoveryCodeTTL)
 	userH := userHandler.NewHandler(userSvc)
 
