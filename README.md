@@ -4,6 +4,8 @@
 
 A web service for multi-party barter: a user lists an item and describes what they want in return; the system finds circular exchange chains among several participants (2–5 people), suggests options, collects responses and completes the deal through soft and hard locking of offers.
 
+Demo: https://menyayka.lorot.dev
+
 ---
 
 ## Table of contents
