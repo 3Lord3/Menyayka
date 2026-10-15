@@ -156,12 +156,13 @@ services:
   caddy:
     container_name: menyayka-caddy
     image: caddy:2-alpine
-    # CADDY_HTTP_PORT / CADDY_HTTPS_PORT let the host shift Caddy to high ports
-    # when 80/443 are already taken (e.g. by a system nginx). Set them in .env
-    # and update the host reverse-proxy accordingly.
+    # Only CADDY_HTTP_PORT is exposed — TLS is terminated by the fronting
+    # host proxy (nginx / Caddy / LB), so this in-cluster Caddy serves plain
+    # HTTP on a single port. Set CADDY_HTTP_PORT in .env when 80 is already
+    # taken on the host (e.g. by a system nginx). 443 is not bound: nothing in
+    # the Caddyfile uses `https://`.
     ports:
       - "${CADDY_HTTP_PORT:-80}:80"
-      - "${CADDY_HTTPS_PORT:-443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

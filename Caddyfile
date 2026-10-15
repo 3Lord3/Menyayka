@@ -1,6 +1,12 @@
-# Catch-all site block. Domain-based routing is done by the fronting reverse
-# proxy (the host nginx / Caddy / load balancer), so this Caddy only listens
-# on the in-cluster 18080 / 18443 ports and answers for any Host header.
+# Catch-all site block. Domain-based routing and TLS termination are done by
+# the fronting reverse proxy (the host nginx / Caddy / load balancer), so this
+# in-cluster Caddy only serves plain HTTP for whatever Host header reaches it.
+# The exposed port comes from CADDY_HTTP_PORT in compose (default 80; override
+# when the host already binds it).
+{
+	auto_https off
+}
+
 http:// {
 	encode gzip
 
