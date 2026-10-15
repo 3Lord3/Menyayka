@@ -1,4 +1,7 @@
-example.com, www.example.com {
+# Catch-all site block. Domain-based routing is done by the fronting reverse
+# proxy (the host nginx / Caddy / load balancer), so this Caddy only listens
+# on the in-cluster 18080 / 18443 ports and answers for any Host header.
+http:// {
 	encode gzip
 
 	# Backend liveness (don't serve the SPA from the frontend)
@@ -6,7 +9,7 @@ example.com, www.example.com {
 		reverse_proxy backend:8080
 	}
 
-	# Item photos from SeaweedFS S3 backend: https://example.com/s3/items/...
+	# Item photos from the SeaweedFS S3 backend.
 	handle_path /s3/* {
 		reverse_proxy seaweedfs:9000
 	}

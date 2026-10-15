@@ -10,8 +10,6 @@ services:
       POSTGRES_USER: menyayka
       POSTGRES_PASSWORD: menyayka
       POSTGRES_DB: menyayka
-    ports:
-      - "5432:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U menyayka -d menyayka"]
       interval: 5s

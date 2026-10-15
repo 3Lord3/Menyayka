@@ -3,7 +3,7 @@
 # (see .env.deploy.example), then compose pull / migrate / up.
 #
 # Required env: see .env.deploy.example
-# (DB_*, JWT_SECRET, S3, SMTP, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
+# (DB_*, JWT_SECRET, S3, RESEND, DOCKER_IMAGE_PREFIX, IMAGE_TAG).
 #
 # image: — what CI pulls from GHCR.
 # build: — the fallback path for manual builds on the VPS (compose build);
@@ -98,12 +98,8 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-info}
       - DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=disable
       - JWT_SECRET=${JWT_SECRET}
-      - SMTP_HOST=${SMTP_HOST:-}
-      - SMTP_PORT=${SMTP_PORT:-465}
-      - SMTP_USERNAME=${SMTP_USERNAME:-}
-      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
-      - SMTP_FROM=${SMTP_FROM:-}
-      - SMTP_ENCRYPTION=${SMTP_ENCRYPTION:-tls}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - MAIL_FROM=${MAIL_FROM:-}
       - TEI_URL=http://tei:80
       - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-tei}
       - VECTOR_DIM=${VECTOR_DIM:-384}
@@ -153,9 +149,12 @@ services:
   caddy:
     container_name: menyayka-caddy
     image: caddy:2-alpine
+    # CADDY_HTTP_PORT / CADDY_HTTPS_PORT let the host shift Caddy to high ports
+    # when 80/443 are already taken (e.g. by a system nginx). Set them in .env
+    # and update the host reverse-proxy accordingly.
     ports:
-      - "80:80"
-      - "443:443"
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
