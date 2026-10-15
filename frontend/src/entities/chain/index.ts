@@ -25,8 +25,6 @@ export {
   type ChainStatus,
   type ChainVoteResult,
   type ConfirmResult,
-  type ConfirmVoteMeta,
-  type DealState,
   type DeclineResult,
   type ExchangeOption,
   type ExchangeOptions,
@@ -37,7 +35,7 @@ export {
   type VoteValue,
 } from './model';
 export { formatRemaining } from './deadline';
-export { participantAlias, type ParticipantAlias } from './alias';
+export { participantAlias } from './alias';
 export { invalidateChainQueries } from './invalidate';
 export {
   confirmChain,

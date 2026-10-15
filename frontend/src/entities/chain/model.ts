@@ -133,7 +133,7 @@ export const VOTE_META: Partial<Record<VoteValue, ConfirmVoteMeta>> = {
   rejected: { label: 'Отклик отклонён', tone: 'error' },
 };
 
-export interface ConfirmVoteMeta {
+interface ConfirmVoteMeta {
   label: string;
   tone: StatusTone;
 }
@@ -247,7 +247,7 @@ export function needsMyAction(chain: Chain): boolean {
   return chain.status === 'PROPOSED' && myConfirmVote(chain) !== 'approved';
 }
 
-export type DealState =
+type DealState =
   | { status: 'ship'; deadlineAt: string | null }
   | { status: 'shipped-waiting'; shipped: number; total: number }
   | { status: 'in-transit'; shipped: number; total: number }

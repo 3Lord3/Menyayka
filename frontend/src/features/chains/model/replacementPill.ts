@@ -1,6 +1,6 @@
 import type { StatusTone } from '@shared/ui';
 
-export interface ReplacementPillMeta {
+interface ReplacementPillMeta {
   text: string;
   tone: StatusTone;
 }

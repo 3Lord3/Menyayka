@@ -20,7 +20,7 @@ interface NewPasswordValues {
   confirm: string;
 }
 
-export type RecoveryState =
+type RecoveryState =
   | { step: 'email'; sending: boolean }
   | {
       step: 'code';

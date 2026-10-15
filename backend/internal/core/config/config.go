@@ -43,7 +43,6 @@ type Config struct {
 	// Provider: "tei" | "stub" | "" (empty = stub for local dev without TEI).
 	EmbeddingProvider string
 	TEIURL            string
-	VectorDim         int
 	EmbeddingTimeout  time.Duration
 	MaxInputLength    int
 	// S3* config for item-photo object storage (see pkg/storage).
@@ -63,12 +62,10 @@ type Config struct {
 	// Matching* config for vector candidate search (SCRUM-24). pgvector only yields
 	// top/threshold semantic candidates; cycle search and clusters are built on top
 	// in Go. Parameters come from the environment.
-	MatchingTopK           int     // LIMIT for top-K graph edges (default 20)
 	MatchingThreshold      float64 // cosine threshold for want→item edges (default 0.5)
 	ClusterTopK            int     // candidate LIMIT during clustering (default 50)
 	ClusterThreshold       float64 // same-direction offer+want threshold (default 0.9)
 	ClusterDirectionMargin float64 // margin of forward over reverse similarity without category
-	VectorMetric           string  // "cosine" (fixed, matches the index)
 	CycleOutgoingK         int     // max outgoing edges per vertex
 	CycleMaxDrafts         int     // max chain drafts to return
 	CycleMinAverageScore   float64 // min average quality of a cycle's edges
@@ -111,19 +108,11 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
-	vectorDim, err := envIntOrDefault("VECTOR_DIM", 384)
-	if err != nil {
-		return nil, err
-	}
 	embeddingTimeout, err := envDurationOrDefault("EMBEDDING_TIMEOUT", 2*time.Second)
 	if err != nil {
 		return nil, err
 	}
 	maxInputLength, err := envIntOrDefault("MAX_INPUT_LENGTH", 1500)
-	if err != nil {
-		return nil, err
-	}
-	matchingTopK, err := envIntOrDefault("MATCHING_TOPK", 20)
 	if err != nil {
 		return nil, err
 	}
@@ -230,16 +219,13 @@ func Load() (*Config, error) {
 
 		EmbeddingProvider: envOrDefault("EMBEDDING_PROVIDER", "stub"),
 		TEIURL:            envOrDefault("TEI_URL", "http://tei:80"),
-		VectorDim:         vectorDim,
 		EmbeddingTimeout:  embeddingTimeout,
 		MaxInputLength:    maxInputLength,
 
-		MatchingTopK:           matchingTopK,
 		MatchingThreshold:      matchingThreshold,
 		ClusterTopK:            clusterTopK,
 		ClusterThreshold:       clusterThreshold,
 		ClusterDirectionMargin: clusterDirectionMargin,
-		VectorMetric:           envOrDefault("VECTOR_METRIC", "cosine"),
 		CycleOutgoingK:         cycleOutgoingK,
 		CycleMaxDrafts:         cycleMaxDrafts,
 		CycleMinAverageScore:   cycleMinAverageScore,
